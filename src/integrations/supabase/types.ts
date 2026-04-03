@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           active: boolean
           agent_type: Database["public"]["Enums"]["agent_type"]
+          avatar_url: string | null
           away_message: string | null
           company_id: string
           created_at: string
@@ -42,6 +43,7 @@ export type Database = {
           schedule_enabled: boolean | null
           schedule_end: string | null
           schedule_start: string | null
+          status: string | null
           temperature: number
           tone: string
           updated_at: string
@@ -52,6 +54,7 @@ export type Database = {
         Insert: {
           active?: boolean
           agent_type?: Database["public"]["Enums"]["agent_type"]
+          avatar_url?: string | null
           away_message?: string | null
           company_id: string
           created_at?: string
@@ -76,6 +79,7 @@ export type Database = {
           schedule_enabled?: boolean | null
           schedule_end?: string | null
           schedule_start?: string | null
+          status?: string | null
           temperature?: number
           tone?: string
           updated_at?: string
@@ -86,6 +90,7 @@ export type Database = {
         Update: {
           active?: boolean
           agent_type?: Database["public"]["Enums"]["agent_type"]
+          avatar_url?: string | null
           away_message?: string | null
           company_id?: string
           created_at?: string
@@ -110,6 +115,7 @@ export type Database = {
           schedule_enabled?: boolean | null
           schedule_end?: string | null
           schedule_start?: string | null
+          status?: string | null
           temperature?: number
           tone?: string
           updated_at?: string
