@@ -20,25 +20,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Use platform-level OpenAI key (reseller model)
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiApiKey) {
+      console.error("OPENAI_API_KEY secret not configured");
+      return new Response(JSON.stringify({ error: "OpenAI API key not configured on platform" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    // Get company info (OpenAI key)
-    const { data: company, error: companyError } = await supabase
-      .from("companies")
-      .select("openai_api_key")
-      .eq("id", company_id)
-      .single();
-
-    if (companyError || !company?.openai_api_key) {
-      console.error("OpenAI API key not found:", companyError);
-      return new Response(JSON.stringify({ error: "OpenAI API key not configured. Go to Settings." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     // Get SDR config
     const { data: sdrConfig, error: sdrError } = await supabase
@@ -119,11 +114,11 @@ Regras importantes:
       })),
     ];
 
-    // Call OpenAI API
+    // Call OpenAI API using platform key
     const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${company.openai_api_key}`,
+        Authorization: `Bearer ${openaiApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -145,7 +140,7 @@ Regras importantes:
         });
       }
       if (aiResponse.status === 401) {
-        return new Response(JSON.stringify({ error: "Invalid OpenAI API key. Check Settings." }), {
+        return new Response(JSON.stringify({ error: "Invalid OpenAI API key." }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

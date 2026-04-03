@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, Eye, EyeOff, Copy, CheckCircle, Users, ShieldCheck, User } from "lucide-react";
 import { toast } from "sonner";
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
@@ -17,9 +18,7 @@ export default function Settings() {
   const { isAdmin } = useUserRole();
   const queryClient = useQueryClient();
   const [companyName, setCompanyName] = useState("");
-  const [showOpenAI, setShowOpenAI] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
-  const [openaiKey, setOpenaiKey] = useState("");
   const [whatsappToken, setWhatsappToken] = useState("");
   const [phoneId, setPhoneId] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
@@ -31,7 +30,7 @@ export default function Settings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("companies")
-        .select("name, whatsapp_token, whatsapp_phone_id, whatsapp_verify_token, openai_api_key")
+        .select("name, whatsapp_token, whatsapp_phone_id, whatsapp_verify_token")
         .eq("id", companyId!)
         .single();
       if (error) throw error;
@@ -71,7 +70,6 @@ export default function Settings() {
       setWhatsappToken(company.whatsapp_token || "");
       setPhoneId(company.whatsapp_phone_id || "");
       setVerifyToken(company.whatsapp_verify_token || "");
-      setOpenaiKey(company.openai_api_key || "");
     }
   }, [company]);
 
@@ -82,7 +80,6 @@ export default function Settings() {
         whatsapp_token: whatsappToken,
         whatsapp_phone_id: phoneId,
         whatsapp_verify_token: verifyToken,
-        openai_api_key: openaiKey,
       }).eq("id", companyId!);
       if (error) throw error;
     },
@@ -217,28 +214,8 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>OpenAI</CardTitle>
-              <CardDescription>Chave de API para o SDR IA</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>API Key</Label>
-                <div className="relative">
-                  <Input
-                    type={showOpenAI ? "text" : "password"}
-                    value={openaiKey}
-                    onChange={(e) => setOpenaiKey(e.target.value)}
-                    placeholder="sk-..."
-                  />
-                  <button type="button" onClick={() => setShowOpenAI(!showOpenAI)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showOpenAI ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
+
         </>
       )}
 
