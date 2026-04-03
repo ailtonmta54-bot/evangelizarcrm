@@ -1,13 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MessageSquare, DollarSign, TrendingUp } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-
-const stats = [
-  { title: "Total de Leads", value: "1.284", icon: Users, change: "+12%" },
-  { title: "Conversas Ativas", value: "47", icon: MessageSquare, change: "+5%" },
-  { title: "Vendas Realizadas", value: "89", icon: DollarSign, change: "+23%" },
-  { title: "Taxa de Conversão", value: "6.9%", icon: TrendingUp, change: "+2.1%" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompanyId } from "@/hooks/use-company-id";
 
 const chartData = [
   { name: "Jan", leads: 65, vendas: 12 },
@@ -19,6 +15,44 @@ const chartData = [
 ];
 
 export default function Dashboard() {
+  const companyId = useCompanyId();
+
+  const { data: leadCount = 0 } = useQuery({
+    queryKey: ["leads-count", companyId],
+    queryFn: async () => {
+      const { count } = await supabase.from("leads").select("*", { count: "exact", head: true });
+      return count ?? 0;
+    },
+    enabled: !!companyId,
+  });
+
+  const { data: activeMessages = 0 } = useQuery({
+    queryKey: ["active-messages", companyId],
+    queryFn: async () => {
+      const { count } = await supabase.from("messages").select("*", { count: "exact", head: true });
+      return count ?? 0;
+    },
+    enabled: !!companyId,
+  });
+
+  const { data: closedDeals = 0 } = useQuery({
+    queryKey: ["closed-deals", companyId],
+    queryFn: async () => {
+      const { count } = await supabase.from("leads").select("*", { count: "exact", head: true }).eq("status", "fechado");
+      return count ?? 0;
+    },
+    enabled: !!companyId,
+  });
+
+  const conversionRate = leadCount > 0 ? ((closedDeals / leadCount) * 100).toFixed(1) : "0";
+
+  const stats = [
+    { title: "Total de Leads", value: String(leadCount), icon: Users },
+    { title: "Mensagens", value: String(activeMessages), icon: MessageSquare },
+    { title: "Vendas Realizadas", value: String(closedDeals), icon: DollarSign },
+    { title: "Taxa de Conversão", value: `${conversionRate}%`, icon: TrendingUp },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -35,7 +69,6 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-primary mt-1">{stat.change} este mês</p>
             </CardContent>
           </Card>
         ))}
@@ -43,7 +76,7 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Leads & Vendas</CardTitle>
+          <CardTitle>Leads & Vendas (mock)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">

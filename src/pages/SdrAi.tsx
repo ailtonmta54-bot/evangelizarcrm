@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,15 +6,47 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Bot, Save } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompanyId } from "@/hooks/use-company-id";
 
 export default function SdrAi() {
-  const [prompt, setPrompt] = useState("Você é um assistente de vendas da empresa. Seja cordial, objetivo e ajude o cliente a entender nossos produtos e serviços.");
+  const companyId = useCompanyId();
+  const queryClient = useQueryClient();
+  const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState("amigavel");
   const [goal, setGoal] = useState("qualificar");
 
-  const handleSave = () => {
-    toast.success("Configurações do SDR IA salvas com sucesso!");
-  };
+  const { data: config } = useQuery({
+    queryKey: ["sdr-config", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("sdr_config").select("*").single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId,
+  });
+
+  useEffect(() => {
+    if (config) {
+      setPrompt(config.prompt);
+      setTone(config.tone);
+      setGoal(config.goal);
+    }
+  }, [config]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!config) return;
+      const { error } = await supabase.from("sdr_config").update({ prompt, tone, goal }).eq("id", config.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sdr-config"] });
+      toast.success("Configurações do SDR IA salvas!");
+    },
+    onError: () => toast.error("Erro ao salvar configurações"),
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
@@ -31,22 +63,15 @@ export default function SdrAi() {
             </div>
             <div>
               <CardTitle>Configuração do Robô</CardTitle>
-              <CardDescription>Defina como o SDR IA deve se comportar nas conversas</CardDescription>
+              <CardDescription>Defina como o SDR IA deve se comportar</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="prompt">Prompt principal</Label>
-            <Textarea
-              id="prompt"
-              rows={5}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Descreva como o robô deve se comportar..."
-            />
+            <Textarea id="prompt" rows={5} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tom de voz</Label>
@@ -71,9 +96,8 @@ export default function SdrAi() {
               </Select>
             </div>
           </div>
-
-          <Button onClick={handleSave} className="gap-2">
-            <Save className="h-4 w-4" /> Salvar configurações
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+            <Save className="h-4 w-4" /> {saveMutation.isPending ? "Salvando..." : "Salvar configurações"}
           </Button>
         </CardContent>
       </Card>

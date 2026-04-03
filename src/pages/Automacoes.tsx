@@ -8,20 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Zap, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-
-interface Automation {
-  id: string;
-  name: string;
-  trigger: string;
-  message: string;
-  active: boolean;
-}
-
-const initialAutomations: Automation[] = [
-  { id: "1", name: "Mensagem de Boas-vindas", trigger: "novo_lead", message: "Olá! Seja bem-vindo. Como posso ajudá-lo?", active: true },
-  { id: "2", name: "Follow-up 24h", trigger: "sem_resposta", message: "Oi! Vi que não conseguimos conversar. Posso ajudar com algo?", active: true },
-  { id: "3", name: "Lembrete de proposta", trigger: "proposta_enviada", message: "Olá! Gostaria de saber se teve a chance de analisar nossa proposta.", active: false },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompanyId } from "@/hooks/use-company-id";
 
 const triggerLabels: Record<string, string> = {
   novo_lead: "Novo Lead",
@@ -30,28 +19,48 @@ const triggerLabels: Record<string, string> = {
 };
 
 export default function Automacoes() {
-  const [automations, setAutomations] = useState(initialAutomations);
+  const companyId = useCompanyId();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTrigger, setNewTrigger] = useState("novo_lead");
   const [newMessage, setNewMessage] = useState("");
 
-  const handleCreate = () => {
-    if (!newName || !newMessage) return;
-    setAutomations((prev) => [
-      ...prev,
-      { id: Date.now().toString(), name: newName, trigger: newTrigger, message: newMessage, active: true },
-    ]);
-    setNewName("");
-    setNewMessage("");
-    setOpen(false);
-    toast.success("Automação criada com sucesso!");
-  };
+  const { data: automations = [] } = useQuery({
+    queryKey: ["automations", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("automations").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId,
+  });
 
-  const handleDelete = (id: string) => {
-    setAutomations((prev) => prev.filter((a) => a.id !== id));
-    toast.success("Automação removida");
-  };
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("automations").insert({
+        name: newName, trigger_type: newTrigger, message: newMessage, company_id: companyId!,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["automations"] });
+      setNewName(""); setNewMessage(""); setOpen(false);
+      toast.success("Automação criada!");
+    },
+    onError: () => toast.error("Erro ao criar automação"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("automations").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["automations"] });
+      toast.success("Automação removida");
+    },
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
@@ -65,9 +74,7 @@ export default function Automacoes() {
             <Button className="gap-2"><Plus className="h-4 w-4" /> Nova automação</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar automação</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Criar automação</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-2">
               <div className="space-y-2">
                 <Label>Nome</Label>
@@ -88,7 +95,9 @@ export default function Automacoes() {
                 <Label>Mensagem</Label>
                 <Textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Mensagem automática..." rows={3} />
               </div>
-              <Button onClick={handleCreate} className="w-full">Criar automação</Button>
+              <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} className="w-full">
+                {createMutation.isPending ? "Criando..." : "Criar automação"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -108,15 +117,18 @@ export default function Automacoes() {
                     {auto.active ? "Ativa" : "Inativa"}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Gatilho: {triggerLabels[auto.trigger] || auto.trigger}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Gatilho: {triggerLabels[auto.trigger_type] || auto.trigger_type}</p>
                 <p className="text-sm text-muted-foreground mt-1 truncate">{auto.message}</p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => handleDelete(auto.id)} className="shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(auto.id)} className="shrink-0">
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             </CardContent>
           </Card>
         ))}
+        {automations.length === 0 && (
+          <p className="text-center text-muted-foreground py-8">Nenhuma automação criada ainda.</p>
+        )}
       </div>
     </div>
   );

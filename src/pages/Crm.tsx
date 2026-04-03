@@ -1,41 +1,48 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Phone, GripVertical } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompanyId } from "@/hooks/use-company-id";
+import { toast } from "sonner";
+import type { Tables } from "@/integrations/supabase/types";
 
-interface Lead {
-  id: string;
-  name: string;
-  phone: string;
-  column: string;
-}
-
-const initialLeads: Lead[] = [
-  { id: "1", name: "Maria Santos", phone: "(11) 99999-1234", column: "novo" },
-  { id: "2", name: "Carlos Oliveira", phone: "(21) 98888-5678", column: "novo" },
-  { id: "3", name: "Ana Costa", phone: "(31) 97777-9012", column: "atendimento" },
-  { id: "4", name: "Pedro Lima", phone: "(41) 96666-3456", column: "proposta" },
-  { id: "5", name: "Juliana Rocha", phone: "(51) 95555-7890", column: "proposta" },
-  { id: "6", name: "Roberto Alves", phone: "(61) 94444-2345", column: "fechado" },
-];
+type Lead = Tables<"leads">;
 
 const columns = [
-  { id: "novo", title: "Novo Lead", color: "bg-info" },
-  { id: "atendimento", title: "Em Atendimento", color: "bg-warning" },
-  { id: "proposta", title: "Proposta", color: "bg-primary" },
-  { id: "fechado", title: "Fechado", color: "bg-success" },
+  { id: "novo" as const, title: "Novo Lead", color: "bg-info" },
+  { id: "atendimento" as const, title: "Em Atendimento", color: "bg-warning" },
+  { id: "proposta" as const, title: "Proposta", color: "bg-primary" },
+  { id: "fechado" as const, title: "Fechado", color: "bg-success" },
 ];
 
 export default function Crm() {
-  const [leads, setLeads] = useState(initialLeads);
+  const companyId = useCompanyId();
+  const queryClient = useQueryClient();
   const [dragging, setDragging] = useState<string | null>(null);
 
-  const handleDragStart = (id: string) => setDragging(id);
+  const { data: leads = [] } = useQuery({
+    queryKey: ["leads", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Lead[];
+    },
+    enabled: !!companyId,
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("leads").update({ status: status as Lead["status"] }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+    onError: () => toast.error("Erro ao mover lead"),
+  });
 
   const handleDrop = (column: string) => {
     if (!dragging) return;
-    setLeads((prev) =>
-      prev.map((l) => (l.id === dragging ? { ...l, column } : l))
-    );
+    updateStatus.mutate({ id: dragging, status: column });
     setDragging(null);
   };
 
@@ -48,7 +55,7 @@ export default function Crm() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {columns.map((col) => {
-          const colLeads = leads.filter((l) => l.column === col.id);
+          const colLeads = leads.filter((l) => l.status === col.id);
           return (
             <div
               key={col.id}
@@ -68,7 +75,7 @@ export default function Crm() {
                   <Card
                     key={lead.id}
                     draggable
-                    onDragStart={() => handleDragStart(lead.id)}
+                    onDragStart={() => setDragging(lead.id)}
                     className="cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
                   >
                     <CardContent className="p-3">
