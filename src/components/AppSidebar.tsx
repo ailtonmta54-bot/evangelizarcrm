@@ -28,7 +28,7 @@ const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: false },
   { title: "Inbox", url: "/inbox", icon: MessageSquare, adminOnly: false },
   { title: "CRM", url: "/crm", icon: Kanban, adminOnly: false },
-  { title: "SDR IA", url: "/sdr-ai", icon: Bot, adminOnly: true },
+  { title: "Robôs IA", url: "/robos", icon: Bot, adminOnly: true },
   { title: "Automações", url: "/automacoes", icon: Zap, adminOnly: true },
   { title: "Produtos", url: "/produtos", icon: Package, adminOnly: false },
   { title: "Configurações", url: "/settings", icon: Settings, adminOnly: false },

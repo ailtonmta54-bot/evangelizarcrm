@@ -35,7 +35,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/inbox" element={<Inbox />} />
                 <Route path="/crm" element={<Crm />} />
-                <Route path="/sdr-ai" element={<SdrAi />} />
+                <Route path="/robos" element={<Robos />} />
                 <Route path="/automacoes" element={<Automacoes />} />
                 <Route path="/produtos" element={<Produtos />} />
                 <Route path="/settings" element={<Settings />} />
