@@ -70,7 +70,6 @@ export default function Settings() {
       setWhatsappToken(company.whatsapp_token || "");
       setPhoneId(company.whatsapp_phone_id || "");
       setVerifyToken(company.whatsapp_verify_token || "");
-      setOpenaiKey(company.openai_api_key || "");
     }
   }, [company]);
 
