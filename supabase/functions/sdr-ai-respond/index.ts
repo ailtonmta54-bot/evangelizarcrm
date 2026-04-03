@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use platform-level OpenAI key (reseller model)
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiApiKey) {
       console.error("OPENAI_API_KEY secret not configured");
@@ -35,36 +34,55 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get SDR config
-    const { data: sdrConfig, error: sdrError } = await supabase
-      .from("sdr_config")
-      .select("*")
-      .eq("company_id", company_id)
-      .single();
-
-    if (sdrError || !sdrConfig) {
-      return new Response(JSON.stringify({ error: "SDR config not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!sdrConfig.active) {
-      return new Response(JSON.stringify({ skipped: true, reason: "SDR IA is disabled" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // Get lead info
     const { data: lead } = await supabase
       .from("leads")
-      .select("name, phone, ai_enabled")
+      .select("name, phone, ai_enabled, agent_id")
       .eq("id", lead_id)
       .single();
 
     if (!lead?.ai_enabled) {
       return new Response(JSON.stringify({ skipped: true, reason: "AI disabled for this lead" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get agent config - use lead's assigned agent, or default agent, or any active agent
+    let agentQuery;
+    if (lead.agent_id) {
+      agentQuery = supabase.from("agents").select("*").eq("id", lead.agent_id).single();
+    } else {
+      // Try default agent first
+      agentQuery = supabase.from("agents").select("*")
+        .eq("company_id", company_id)
+        .eq("active", true)
+        .eq("is_default", true)
+        .limit(1)
+        .single();
+    }
+
+    let { data: agent } = await agentQuery;
+
+    // Fallback: any active agent for this company
+    if (!agent) {
+      const { data: fallback } = await supabase.from("agents").select("*")
+        .eq("company_id", company_id)
+        .eq("active", true)
+        .limit(1)
+        .single();
+      agent = fallback;
+    }
+
+    if (!agent) {
+      return new Response(JSON.stringify({ skipped: true, reason: "No active agent found" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!agent.active) {
+      return new Response(JSON.stringify({ skipped: true, reason: "Agent is disabled" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -83,20 +101,29 @@ Deno.serve(async (req) => {
       formal: "Seja formal e profissional.",
       persuasivo: "Seja persuasivo e convincente, destaque benefícios.",
       amigavel: "Seja amigável, cordial e acolhedor.",
+      tecnico: "Seja técnico e detalhista, use termos específicos da área.",
+      casual: "Seja casual e descontraído, como um amigo.",
     };
 
     const goalMap: Record<string, string> = {
       fechar: "Seu objetivo é fechar a venda. Conduza o cliente para a decisão de compra.",
       qualificar: "Seu objetivo é qualificar o lead. Faça perguntas para entender as necessidades.",
       agendar: "Seu objetivo é agendar uma reunião ou demonstração com o cliente.",
+      suporte: "Seu objetivo é resolver o problema do cliente de forma eficiente.",
+      informar: "Seu objetivo é informar e educar o cliente sobre os produtos/serviços.",
     };
 
-    const systemPrompt = `Você é um SDR (Sales Development Representative) inteligente de uma empresa.
+    const knowledgeBlock = agent.knowledge
+      ? `\n\nBase de conhecimento:\n${agent.knowledge}`
+      : "";
 
-${sdrConfig.prompt}
+    const systemPrompt = `Você é "${agent.name}", um assistente virtual inteligente de uma empresa.
 
-${toneMap[sdrConfig.tone] || toneMap.amigavel}
-${goalMap[sdrConfig.goal] || goalMap.qualificar}
+${agent.prompt}
+${knowledgeBlock}
+
+${toneMap[agent.tone] || toneMap.amigavel}
+${goalMap[agent.goal] || goalMap.qualificar}
 
 Regras importantes:
 - Responda de forma concisa (máximo 2-3 frases)
@@ -114,7 +141,6 @@ Regras importantes:
       })),
     ];
 
-    // Call OpenAI API using platform key
     const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -124,7 +150,7 @@ Regras importantes:
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: aiMessages,
-        temperature: Number(sdrConfig.temperature) || 0.7,
+        temperature: Number(agent.temperature) || 0.7,
         max_tokens: 300,
       }),
     });
@@ -162,10 +188,10 @@ Regras importantes:
       });
     }
 
-    console.log("AI generated response for lead:", lead_id, generatedMessage);
+    console.log(`Agent "${agent.name}" response for lead ${lead_id}:`, generatedMessage);
 
     return new Response(
-      JSON.stringify({ success: true, message: generatedMessage }),
+      JSON.stringify({ success: true, message: generatedMessage, agent_name: agent.name }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
