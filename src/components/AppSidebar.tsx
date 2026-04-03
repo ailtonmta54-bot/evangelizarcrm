@@ -7,9 +7,12 @@ import {
   Package,
   Settings,
   Cross,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useUserRole } from "@/hooks/use-user-role";
+import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -22,19 +25,22 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Inbox", url: "/inbox", icon: MessageSquare },
-  { title: "CRM", url: "/crm", icon: Kanban },
-  { title: "SDR IA", url: "/sdr-ai", icon: Bot },
-  { title: "Automações", url: "/automacoes", icon: Zap },
-  { title: "Produtos", url: "/produtos", icon: Package },
-  { title: "Configurações", url: "/settings", icon: Settings },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: false },
+  { title: "Inbox", url: "/inbox", icon: MessageSquare, adminOnly: false },
+  { title: "CRM", url: "/crm", icon: Kanban, adminOnly: false },
+  { title: "SDR IA", url: "/sdr-ai", icon: Bot, adminOnly: true },
+  { title: "Automações", url: "/automacoes", icon: Zap, adminOnly: true },
+  { title: "Produtos", url: "/produtos", icon: Package, adminOnly: false },
+  { title: "Configurações", url: "/settings", icon: Settings, adminOnly: false },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { isAdmin } = useUserRole();
+
+  const visibleItems = menuItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <Sidebar collapsible="icon">
@@ -51,7 +57,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -69,6 +75,15 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {!collapsed && (
+          <div className="mt-auto px-4 pb-4">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>{isAdmin ? "Admin" : "Usuário"}</span>
+            </div>
+          </div>
+        )}
       </SidebarContent>
     </Sidebar>
   );
