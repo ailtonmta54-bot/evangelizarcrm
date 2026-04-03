@@ -18,9 +18,7 @@ export default function Settings() {
   const { isAdmin } = useUserRole();
   const queryClient = useQueryClient();
   const [companyName, setCompanyName] = useState("");
-  const [showOpenAI, setShowOpenAI] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
-  const [openaiKey, setOpenaiKey] = useState("");
   const [whatsappToken, setWhatsappToken] = useState("");
   const [phoneId, setPhoneId] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
