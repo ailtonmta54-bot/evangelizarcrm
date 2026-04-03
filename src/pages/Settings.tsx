@@ -80,7 +80,6 @@ export default function Settings() {
         whatsapp_token: whatsappToken,
         whatsapp_phone_id: phoneId,
         whatsapp_verify_token: verifyToken,
-        openai_api_key: openaiKey,
       }).eq("id", companyId!);
       if (error) throw error;
     },
