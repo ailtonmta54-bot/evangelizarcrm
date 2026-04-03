@@ -29,11 +29,15 @@ export type Database = {
           google_calendar_id: string | null
           google_calendar_link: string | null
           id: string
+          ignore_groups: boolean | null
+          ignore_video_calls: boolean | null
+          ignore_voice_calls: boolean | null
           is_default: boolean
           keywords: string | null
           knowledge: string
           name: string
           prompt: string
+          recognize_audio: boolean | null
           schedule_days: string | null
           schedule_enabled: boolean | null
           schedule_end: string | null
@@ -59,11 +63,15 @@ export type Database = {
           google_calendar_id?: string | null
           google_calendar_link?: string | null
           id?: string
+          ignore_groups?: boolean | null
+          ignore_video_calls?: boolean | null
+          ignore_voice_calls?: boolean | null
           is_default?: boolean
           keywords?: string | null
           knowledge?: string
           name: string
           prompt?: string
+          recognize_audio?: boolean | null
           schedule_days?: string | null
           schedule_enabled?: boolean | null
           schedule_end?: string | null
@@ -89,11 +97,15 @@ export type Database = {
           google_calendar_id?: string | null
           google_calendar_link?: string | null
           id?: string
+          ignore_groups?: boolean | null
+          ignore_video_calls?: boolean | null
+          ignore_voice_calls?: boolean | null
           is_default?: boolean
           keywords?: string | null
           knowledge?: string
           name?: string
           prompt?: string
+          recognize_audio?: boolean | null
           schedule_days?: string | null
           schedule_enabled?: boolean | null
           schedule_end?: string | null
