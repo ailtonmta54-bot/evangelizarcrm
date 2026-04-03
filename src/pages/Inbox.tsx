@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Search } from "lucide-react";
+import { Send, Search, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
+import { toast } from "sonner";
 
 export default function Inbox() {
   const companyId = useCompanyId();
@@ -22,6 +23,7 @@ export default function Inbox() {
       return data;
     },
     enabled: !!companyId,
+    refetchInterval: 5000, // Poll for new messages
   });
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId) || leads[0];
@@ -34,22 +36,54 @@ export default function Inbox() {
       return data;
     },
     enabled: !!selectedLead?.id,
+    refetchInterval: 3000,
   });
+
+  // Check if WhatsApp is configured
+  const { data: company } = useQuery({
+    queryKey: ["company-whatsapp", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("companies").select("whatsapp_token, whatsapp_phone_id").eq("id", companyId!).single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId,
+  });
+
+  const whatsappConfigured = !!(company?.whatsapp_token && company?.whatsapp_phone_id);
 
   const sendMutation = useMutation({
     mutationFn: async () => {
       if (!newMessage.trim() || !selectedLead || !companyId) return;
-      const { error } = await supabase.from("messages").insert({
-        lead_id: selectedLead.id,
-        content: newMessage,
-        type: "enviada" as const,
-        company_id: companyId,
-      });
-      if (error) throw error;
+
+      if (whatsappConfigured && selectedLead.phone) {
+        // Send via WhatsApp
+        const { data, error } = await supabase.functions.invoke("whatsapp-send", {
+          body: {
+            to: selectedLead.phone,
+            message: newMessage,
+            lead_id: selectedLead.id,
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      } else {
+        // Save locally only (no WhatsApp)
+        const { error } = await supabase.from("messages").insert({
+          lead_id: selectedLead.id,
+          content: newMessage,
+          type: "enviada" as const,
+          company_id: companyId,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["messages"] });
       setNewMessage("");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Erro ao enviar mensagem");
     },
   });
 
@@ -66,7 +100,7 @@ export default function Inbox() {
         </div>
         <div className="flex-1 overflow-auto scrollbar-thin">
           {filtered.length === 0 && (
-            <p className="text-center text-muted-foreground text-sm py-8">Nenhum lead encontrado. Crie leads no CRM.</p>
+            <p className="text-center text-muted-foreground text-sm py-8">Nenhum lead encontrado.</p>
           )}
           {filtered.map((lead) => (
             <button
@@ -92,16 +126,27 @@ export default function Inbox() {
       <div className="flex-1 flex flex-col min-w-0">
         {selectedLead ? (
           <>
-            <div className="h-14 border-b flex items-center px-4 gap-3 bg-card shrink-0">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                {selectedLead.name.charAt(0)}
+            <div className="h-14 border-b flex items-center justify-between px-4 bg-card shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                  {selectedLead.name.charAt(0)}
+                </div>
+                <div>
+                  <span className="font-medium">{selectedLead.name}</span>
+                  <p className="text-xs text-muted-foreground">{selectedLead.phone}</p>
+                </div>
               </div>
-              <span className="font-medium">{selectedLead.name}</span>
+              {whatsappConfigured && (
+                <div className="flex items-center gap-1 text-xs text-primary">
+                  <MessageSquare className="h-3 w-3" />
+                  <span>WhatsApp ativo</span>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-auto p-4 space-y-3 scrollbar-thin">
               {messages.length === 0 && (
-                <p className="text-center text-muted-foreground text-sm py-8">Nenhuma mensagem ainda. Envie a primeira!</p>
+                <p className="text-center text-muted-foreground text-sm py-8">Nenhuma mensagem ainda.</p>
               )}
               {messages.map((msg) => (
                 <div key={msg.id} className={cn("flex", msg.type === "enviada" ? "justify-end" : "justify-start")}>
@@ -124,10 +169,10 @@ export default function Inbox() {
 
             <div className="p-3 border-t bg-card flex gap-2">
               <Input
-                placeholder="Digite uma mensagem..."
+                placeholder={whatsappConfigured ? "Enviar via WhatsApp..." : "Digite uma mensagem..."}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendMutation.mutate()}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMutation.mutate()}
                 className="flex-1"
               />
               <Button size="icon" onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending}>
