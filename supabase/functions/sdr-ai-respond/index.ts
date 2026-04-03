@@ -20,18 +20,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // Get company info (OpenAI key)
+    const { data: company, error: companyError } = await supabase
+      .from("companies")
+      .select("openai_api_key")
+      .eq("id", company_id)
+      .single();
+
+    if (companyError || !company?.openai_api_key) {
+      console.error("OpenAI API key not found:", companyError);
+      return new Response(JSON.stringify({ error: "OpenAI API key not configured. Go to Settings." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Get SDR config
     const { data: sdrConfig, error: sdrError } = await supabase
@@ -41,7 +48,6 @@ Deno.serve(async (req) => {
       .single();
 
     if (sdrError || !sdrConfig) {
-      console.error("SDR config not found:", sdrError);
       return new Response(JSON.stringify({ error: "SDR config not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -105,7 +111,6 @@ Regras importantes:
 - Sempre termine com uma pergunta ou call-to-action
 - Respeite o contexto da conversa anterior`;
 
-    // Build messages array for AI
     const aiMessages = [
       { role: "system", content: systemPrompt },
       ...(history || []).map((msg) => ({
@@ -114,15 +119,15 @@ Regras importantes:
       })),
     ];
 
-    // Call Lovable AI Gateway
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Call OpenAI API
+    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${company.openai_api_key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gpt-4o-mini",
         messages: aiMessages,
         temperature: Number(sdrConfig.temperature) || 0.7,
         max_tokens: 300,
@@ -131,17 +136,17 @@ Regras importantes:
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
+      console.error("OpenAI API error:", aiResponse.status, errorText);
 
       if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
+        return new Response(JSON.stringify({ error: "OpenAI rate limit exceeded. Try again later." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
-          status: 402,
+      if (aiResponse.status === 401) {
+        return new Response(JSON.stringify({ error: "Invalid OpenAI API key. Check Settings." }), {
+          status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
