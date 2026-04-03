@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lead_id, company_id } = await req.json();
+    const { lead_id, company_id, agent_id } = await req.json();
 
     if (!lead_id || !company_id) {
       return new Response(JSON.stringify({ error: "lead_id and company_id required" }), {
@@ -48,41 +48,36 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get agent config - use lead's assigned agent, or default agent, or any active agent
-    let agentQuery;
-    if (lead.agent_id) {
-      agentQuery = supabase.from("agents").select("*").eq("id", lead.agent_id).single();
-    } else {
-      // Try default agent first
-      agentQuery = supabase.from("agents").select("*")
+    // Get agent - use provided agent_id, then lead's agent, then default
+    let agent = null;
+    const targetAgentId = agent_id || lead.agent_id;
+
+    if (targetAgentId) {
+      const { data } = await supabase.from("agents").select("*").eq("id", targetAgentId).single();
+      agent = data;
+    }
+
+    if (!agent) {
+      const { data } = await supabase.from("agents").select("*")
         .eq("company_id", company_id)
         .eq("active", true)
         .eq("is_default", true)
         .limit(1)
         .single();
+      agent = data;
     }
 
-    let { data: agent } = await agentQuery;
-
-    // Fallback: any active agent for this company
     if (!agent) {
-      const { data: fallback } = await supabase.from("agents").select("*")
+      const { data } = await supabase.from("agents").select("*")
         .eq("company_id", company_id)
         .eq("active", true)
         .limit(1)
         .single();
-      agent = fallback;
+      agent = data;
     }
 
-    if (!agent) {
+    if (!agent || !agent.active) {
       return new Response(JSON.stringify({ skipped: true, reason: "No active agent found" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!agent.active) {
-      return new Response(JSON.stringify({ skipped: true, reason: "Agent is disabled" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -96,7 +91,6 @@ Deno.serve(async (req) => {
       .order("created_at", { ascending: true })
       .limit(20);
 
-    // Build tone description
     const toneMap: Record<string, string> = {
       formal: "Seja formal e profissional.",
       persuasivo: "Seja persuasivo e convincente, destaque benefícios.",
@@ -113,9 +107,7 @@ Deno.serve(async (req) => {
       informar: "Seu objetivo é informar e educar o cliente sobre os produtos/serviços.",
     };
 
-    const knowledgeBlock = agent.knowledge
-      ? `\n\nBase de conhecimento:\n${agent.knowledge}`
-      : "";
+    const knowledgeBlock = agent.knowledge ? `\n\nBase de conhecimento:\n${agent.knowledge}` : "";
 
     const systemPrompt = `Você é "${agent.name}", um assistente virtual inteligente de uma empresa.
 
@@ -135,7 +127,7 @@ Regras importantes:
 
     const aiMessages = [
       { role: "system", content: systemPrompt },
-      ...(history || []).map((msg) => ({
+      ...(history || []).map((msg: any) => ({
         role: msg.type === "recebida" ? "user" : "assistant",
         content: msg.content,
       })),
@@ -158,22 +150,8 @@ Regras importantes:
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("OpenAI API error:", aiResponse.status, errorText);
-
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "OpenAI rate limit exceeded. Try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 401) {
-        return new Response(JSON.stringify({ error: "Invalid OpenAI API key." }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
       return new Response(JSON.stringify({ error: "AI generation failed" }), {
-        status: 500,
+        status: aiResponse.status === 429 ? 429 : 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
