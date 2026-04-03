@@ -4,8 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Eye, EyeOff, Copy, CheckCircle, Users, ShieldCheck, User } from "lucide-react";
+import { Save, Users, ShieldCheck, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,19 +17,13 @@ export default function Settings() {
   const { isAdmin } = useUserRole();
   const queryClient = useQueryClient();
   const [companyName, setCompanyName] = useState("");
-  const [showWhatsApp, setShowWhatsApp] = useState(false);
-  const [whatsappToken, setWhatsappToken] = useState("");
-  const [phoneId, setPhoneId] = useState("");
-  const [verifyToken, setVerifyToken] = useState("");
-
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
 
   const { data: company } = useQuery({
     queryKey: ["company-settings", companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("companies")
-        .select("name, whatsapp_token, whatsapp_phone_id, whatsapp_verify_token")
+        .select("name")
         .eq("id", companyId!)
         .single();
       if (error) throw error;
