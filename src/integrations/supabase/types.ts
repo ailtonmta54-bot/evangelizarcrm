@@ -60,19 +60,31 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          openai_api_key: string | null
           updated_at: string
+          whatsapp_phone_id: string | null
+          whatsapp_token: string | null
+          whatsapp_verify_token: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name?: string
+          openai_api_key?: string | null
           updated_at?: string
+          whatsapp_phone_id?: string | null
+          whatsapp_token?: string | null
+          whatsapp_verify_token?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          openai_api_key?: string | null
           updated_at?: string
+          whatsapp_phone_id?: string | null
+          whatsapp_token?: string | null
+          whatsapp_verify_token?: string | null
         }
         Relationships: []
       }
