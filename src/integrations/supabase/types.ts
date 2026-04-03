@@ -14,11 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      automation_logs: {
+        Row: {
+          automation_id: string
+          company_id: string
+          created_at: string
+          id: string
+          lead_id: string
+          status: string
+        }
+        Insert: {
+          automation_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          status?: string
+        }
+        Update: {
+          automation_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_logs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automations: {
         Row: {
           active: boolean
           company_id: string
           created_at: string
+          delay_hours: number
           id: string
           message: string
           name: string
@@ -29,6 +72,7 @@ export type Database = {
           active?: boolean
           company_id: string
           created_at?: string
+          delay_hours?: number
           id?: string
           message?: string
           name: string
@@ -39,6 +83,7 @@ export type Database = {
           active?: boolean
           company_id?: string
           created_at?: string
+          delay_hours?: number
           id?: string
           message?: string
           name?: string
