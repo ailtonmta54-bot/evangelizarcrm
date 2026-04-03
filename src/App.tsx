@@ -11,7 +11,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Inbox from "./pages/Inbox";
 import Crm from "./pages/Crm";
-import SdrAi from "./pages/SdrAi";
+import Robos from "./pages/Robos";
 import Automacoes from "./pages/Automacoes";
 import Produtos from "./pages/Produtos";
 import Settings from "./pages/Settings";
