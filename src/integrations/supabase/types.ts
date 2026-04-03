@@ -22,7 +22,12 @@ export type Database = {
           company_id: string
           created_at: string
           description: string
+          elevenlabs_enabled: boolean | null
+          elevenlabs_voice_id: string | null
           goal: string
+          google_calendar_enabled: boolean | null
+          google_calendar_id: string | null
+          google_calendar_link: string | null
           id: string
           is_default: boolean
           keywords: string | null
@@ -47,7 +52,12 @@ export type Database = {
           company_id: string
           created_at?: string
           description?: string
+          elevenlabs_enabled?: boolean | null
+          elevenlabs_voice_id?: string | null
           goal?: string
+          google_calendar_enabled?: boolean | null
+          google_calendar_id?: string | null
+          google_calendar_link?: string | null
           id?: string
           is_default?: boolean
           keywords?: string | null
@@ -72,7 +82,12 @@ export type Database = {
           company_id?: string
           created_at?: string
           description?: string
+          elevenlabs_enabled?: boolean | null
+          elevenlabs_voice_id?: string | null
           goal?: string
+          google_calendar_enabled?: boolean | null
+          google_calendar_id?: string | null
+          google_calendar_link?: string | null
           id?: string
           is_default?: boolean
           keywords?: string | null
