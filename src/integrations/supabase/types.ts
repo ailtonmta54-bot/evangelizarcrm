@@ -18,50 +18,77 @@ export type Database = {
         Row: {
           active: boolean
           agent_type: Database["public"]["Enums"]["agent_type"]
+          away_message: string | null
           company_id: string
           created_at: string
           description: string
           goal: string
           id: string
           is_default: boolean
+          keywords: string | null
           knowledge: string
           name: string
           prompt: string
+          schedule_days: string | null
+          schedule_enabled: boolean | null
+          schedule_end: string | null
+          schedule_start: string | null
           temperature: number
           tone: string
           updated_at: string
+          whatsapp_phone_id: string | null
+          whatsapp_token: string | null
+          whatsapp_verify_token: string | null
         }
         Insert: {
           active?: boolean
           agent_type?: Database["public"]["Enums"]["agent_type"]
+          away_message?: string | null
           company_id: string
           created_at?: string
           description?: string
           goal?: string
           id?: string
           is_default?: boolean
+          keywords?: string | null
           knowledge?: string
           name: string
           prompt?: string
+          schedule_days?: string | null
+          schedule_enabled?: boolean | null
+          schedule_end?: string | null
+          schedule_start?: string | null
           temperature?: number
           tone?: string
           updated_at?: string
+          whatsapp_phone_id?: string | null
+          whatsapp_token?: string | null
+          whatsapp_verify_token?: string | null
         }
         Update: {
           active?: boolean
           agent_type?: Database["public"]["Enums"]["agent_type"]
+          away_message?: string | null
           company_id?: string
           created_at?: string
           description?: string
           goal?: string
           id?: string
           is_default?: boolean
+          keywords?: string | null
           knowledge?: string
           name?: string
           prompt?: string
+          schedule_days?: string | null
+          schedule_enabled?: boolean | null
+          schedule_end?: string | null
+          schedule_start?: string | null
           temperature?: number
           tone?: string
           updated_at?: string
+          whatsapp_phone_id?: string | null
+          whatsapp_token?: string | null
+          whatsapp_verify_token?: string | null
         }
         Relationships: [
           {
