@@ -87,7 +87,7 @@ export default function SdrAi() {
           {active && (
             <div className="flex items-center gap-2 text-sm text-primary bg-primary/5 rounded-lg p-3">
               <Sparkles className="h-4 w-4" />
-              <span>O SDR IA responderá automaticamente mensagens recebidas via WhatsApp usando Lovable AI.</span>
+              <span>O SDR IA responderá automaticamente mensagens recebidas via WhatsApp usando OpenAI.</span>
             </div>
           )}
 
