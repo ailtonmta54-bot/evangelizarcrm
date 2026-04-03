@@ -98,7 +98,7 @@ export default function Robos() {
         const { error } = await supabase.from("agents").update({
           name: form.name,
           description: form.description,
-          agent_type: form.agent_type,
+          agent_type: form.agent_type as "vendas" | "atendimento" | "suporte" | "qualificacao" | "agendamento" | "custom",
           prompt: form.prompt,
           tone: form.tone,
           goal: form.goal,
