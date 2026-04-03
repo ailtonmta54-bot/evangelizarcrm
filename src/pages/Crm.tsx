@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Phone, GripVertical } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Phone, GripVertical, Plus, Bot } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
@@ -20,6 +25,9 @@ export default function Crm() {
   const companyId = useCompanyId();
   const queryClient = useQueryClient();
   const [dragging, setDragging] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
 
   const { data: leads = [] } = useQuery({
     queryKey: ["leads", companyId],
@@ -37,7 +45,30 @@ export default function Crm() {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
-    onError: () => toast.error("Erro ao mover lead"),
+  });
+
+  const createLead = useMutation({
+    mutationFn: async () => {
+      if (!newName || !companyId) return;
+      const { error } = await supabase.from("leads").insert({
+        name: newName, phone: newPhone, company_id: companyId, ai_enabled: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      setNewName(""); setNewPhone(""); setOpen(false);
+      toast.success("Lead criado!");
+    },
+    onError: () => toast.error("Erro ao criar lead"),
+  });
+
+  const toggleAi = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const { error } = await supabase.from("leads").update({ ai_enabled: enabled }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
   });
 
   const handleDrop = (column: string) => {
@@ -48,9 +79,32 @@ export default function Crm() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">CRM Pipeline</h1>
-        <p className="text-muted-foreground">Gerencie seus leads no funil de vendas</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">CRM Pipeline</h1>
+          <p className="text-muted-foreground">Gerencie seus leads no funil de vendas</p>
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2"><Plus className="h-4 w-4" /> Novo lead</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Criar lead</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-2">
+              <div className="space-y-2">
+                <Label>Nome</Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do lead" />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone (com código do país)</Label>
+                <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="5511999998888" />
+              </div>
+              <Button onClick={() => createLead.mutate()} disabled={createLead.isPending} className="w-full">
+                {createLead.isPending ? "Criando..." : "Criar lead"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -81,11 +135,20 @@ export default function Crm() {
                     <CardContent className="p-3">
                       <div className="flex items-start gap-2">
                         <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0">
+                        <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">{lead.name}</p>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                             <Phone className="h-3 w-3" />
                             <span>{lead.phone}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <Bot className={`h-3 w-3 ${lead.ai_enabled ? "text-primary" : "text-muted-foreground"}`} />
+                            <span className="text-[10px] text-muted-foreground">IA</span>
+                            <Switch
+                              checked={lead.ai_enabled}
+                              onCheckedChange={(checked) => toggleAi.mutate({ id: lead.id, enabled: checked })}
+                              className="scale-75 origin-left"
+                            />
                           </div>
                         </div>
                       </div>

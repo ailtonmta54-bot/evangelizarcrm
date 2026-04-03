@@ -5,10 +5,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendWhatsAppMessage(token: string, phoneId: string, to: string, message: string) {
+  const response = await fetch(
+    `https://graph.facebook.com/v18.0/${phoneId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: message },
+      }),
+    }
+  );
+  const result = await response.json();
+  if (!response.ok) {
+    console.error("WhatsApp send error:", result);
+  }
+  return { ok: response.ok, result };
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
 
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -25,7 +48,6 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token && challenge) {
-      // Find company with this verify token
       const { data: company } = await supabase
         .from("companies")
         .select("id")
@@ -37,7 +59,6 @@ Deno.serve(async (req) => {
         return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
       }
     }
-
     return new Response("Forbidden", { status: 403 });
   }
 
@@ -52,7 +73,6 @@ Deno.serve(async (req) => {
       const value = changes?.value;
 
       if (!value?.messages || value.messages.length === 0) {
-        // Status update or other non-message event
         return new Response(JSON.stringify({ status: "ok" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -67,10 +87,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Find company by phone number ID
+      // Find company
       const { data: company, error: companyError } = await supabase
         .from("companies")
-        .select("id")
+        .select("id, whatsapp_token, whatsapp_phone_id")
         .eq("whatsapp_phone_id", phoneNumberId)
         .single();
 
@@ -83,20 +103,19 @@ Deno.serve(async (req) => {
       }
 
       for (const message of value.messages) {
-        const fromNumber = message.from; // sender phone number
+        const fromNumber = message.from;
         const messageText = message.text?.body || message.caption || "[mídia]";
         const contactName = value.contacts?.[0]?.profile?.name || fromNumber;
 
-        // Find or create lead by phone number
+        // Find or create lead
         let { data: lead } = await supabase
           .from("leads")
-          .select("id")
+          .select("id, ai_enabled")
           .eq("phone", fromNumber)
           .eq("company_id", company.id)
           .single();
 
         if (!lead) {
-          // Create new lead
           const { data: newLead, error: leadError } = await supabase
             .from("leads")
             .insert({
@@ -104,8 +123,9 @@ Deno.serve(async (req) => {
               phone: fromNumber,
               status: "novo",
               company_id: company.id,
+              ai_enabled: true,
             })
-            .select("id")
+            .select("id, ai_enabled")
             .single();
 
           if (leadError) {
@@ -116,25 +136,78 @@ Deno.serve(async (req) => {
           console.log("New lead created:", lead.id, contactName);
         }
 
-        // Save message
-        const { error: msgError } = await supabase.from("messages").insert({
+        // Save incoming message
+        await supabase.from("messages").insert({
           lead_id: lead.id,
           content: messageText,
           type: "recebida",
           company_id: company.id,
         });
 
-        if (msgError) {
-          console.error("Error saving message:", msgError);
-        } else {
-          console.log("Message saved from:", fromNumber);
-        }
-
-        // Update lead's updated_at to bubble it up in inbox
+        // Update lead timestamp
         await supabase
           .from("leads")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", lead.id);
+
+        console.log("Message saved from:", fromNumber);
+
+        // --- AI SDR Auto-Reply ---
+        if (lead.ai_enabled) {
+          try {
+            // Call SDR AI function
+            const sdrResponse = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/sdr-ai-respond`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  lead_id: lead.id,
+                  company_id: company.id,
+                }),
+              }
+            );
+
+            const sdrResult = await sdrResponse.json();
+
+            if (sdrResult.success && sdrResult.message) {
+              console.log("AI response generated:", sdrResult.message);
+
+              // Send via WhatsApp
+              if (company.whatsapp_token && company.whatsapp_phone_id) {
+                const sendResult = await sendWhatsAppMessage(
+                  company.whatsapp_token,
+                  company.whatsapp_phone_id,
+                  fromNumber,
+                  sdrResult.message
+                );
+
+                if (sendResult.ok) {
+                  // Save AI response to messages
+                  await supabase.from("messages").insert({
+                    lead_id: lead.id,
+                    content: sdrResult.message,
+                    type: "enviada",
+                    company_id: company.id,
+                  });
+                  console.log("AI reply sent to:", fromNumber);
+                } else {
+                  console.error("Failed to send AI reply via WhatsApp");
+                }
+              }
+            } else if (sdrResult.skipped) {
+              console.log("AI skipped:", sdrResult.reason);
+            } else {
+              console.error("AI SDR error:", sdrResult.error);
+            }
+          } catch (aiError) {
+            console.error("AI SDR call failed:", aiError);
+            // Don't fail the webhook — message was saved
+          }
+        }
       }
 
       return new Response(JSON.stringify({ status: "ok" }), {

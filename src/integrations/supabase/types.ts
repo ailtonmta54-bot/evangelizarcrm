@@ -90,6 +90,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          ai_enabled: boolean
           company_id: string
           created_at: string
           id: string
@@ -99,6 +100,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_enabled?: boolean
           company_id: string
           created_at?: string
           id?: string
@@ -108,6 +110,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_enabled?: boolean
           company_id?: string
           created_at?: string
           id?: string
@@ -246,29 +249,35 @@ export type Database = {
       }
       sdr_config: {
         Row: {
+          active: boolean
           company_id: string
           created_at: string
           goal: string
           id: string
           prompt: string
+          temperature: number
           tone: string
           updated_at: string
         }
         Insert: {
+          active?: boolean
           company_id: string
           created_at?: string
           goal?: string
           id?: string
           prompt?: string
+          temperature?: number
           tone?: string
           updated_at?: string
         }
         Update: {
+          active?: boolean
           company_id?: string
           created_at?: string
           goal?: string
           id?: string
           prompt?: string
+          temperature?: number
           tone?: string
           updated_at?: string
         }

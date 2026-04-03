@@ -4,7 +4,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Bot, Save } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { Bot, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +18,8 @@ export default function SdrAi() {
   const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState("amigavel");
   const [goal, setGoal] = useState("qualificar");
+  const [temperature, setTemperature] = useState(0.7);
+  const [active, setActive] = useState(true);
 
   const { data: config } = useQuery({
     queryKey: ["sdr-config", companyId],
@@ -32,13 +36,17 @@ export default function SdrAi() {
       setPrompt(config.prompt);
       setTone(config.tone);
       setGoal(config.goal);
+      setTemperature(Number(config.temperature) || 0.7);
+      setActive(config.active ?? true);
     }
   }, [config]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!config) return;
-      const { error } = await supabase.from("sdr_config").update({ prompt, tone, goal }).eq("id", config.id);
+      const { error } = await supabase.from("sdr_config").update({
+        prompt, tone, goal, temperature, active,
+      }).eq("id", config.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -57,21 +65,42 @@ export default function SdrAi() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Bot className="h-5 w-5 text-primary" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Bot className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Configuração do Robô</CardTitle>
+                <CardDescription>Defina como o SDR IA deve se comportar</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle>Configuração do Robô</CardTitle>
-              <CardDescription>Defina como o SDR IA deve se comportar</CardDescription>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="sdr-active" className="text-sm">
+                {active ? "Ativo" : "Inativo"}
+              </Label>
+              <Switch id="sdr-active" checked={active} onCheckedChange={setActive} />
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
+          {active && (
+            <div className="flex items-center gap-2 text-sm text-primary bg-primary/5 rounded-lg p-3">
+              <Sparkles className="h-4 w-4" />
+              <span>O SDR IA responderá automaticamente mensagens recebidas via WhatsApp usando Lovable AI.</span>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="prompt">Prompt principal</Label>
-            <Textarea id="prompt" rows={5} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+            <Textarea id="prompt" rows={5} value={prompt} onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Descreva o comportamento, produtos, e regras do robô..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Inclua informações sobre seus produtos, preços e regras de atendimento.
+            </p>
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tom de voz</Label>
@@ -96,6 +125,26 @@ export default function SdrAi() {
               </Select>
             </div>
           </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Temperatura (criatividade)</Label>
+              <span className="text-sm text-muted-foreground font-mono">{temperature.toFixed(1)}</span>
+            </div>
+            <Slider
+              value={[temperature]}
+              onValueChange={([v]) => setTemperature(v)}
+              min={0}
+              max={1}
+              step={0.1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Mais preciso</span>
+              <span>Mais criativo</span>
+            </div>
+          </div>
+
           <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
             <Save className="h-4 w-4" /> {saveMutation.isPending ? "Salvando..." : "Salvar configurações"}
           </Button>

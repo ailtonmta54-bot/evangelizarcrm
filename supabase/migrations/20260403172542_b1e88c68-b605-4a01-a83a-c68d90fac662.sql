@@ -1,0 +1,6 @@
+
+ALTER TABLE public.leads ADD COLUMN ai_enabled BOOLEAN NOT NULL DEFAULT true;
+
+ALTER TABLE public.sdr_config 
+  ADD COLUMN temperature NUMERIC(2,1) NOT NULL DEFAULT 0.7,
+  ADD COLUMN active BOOLEAN NOT NULL DEFAULT true;
