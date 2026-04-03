@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      agents: {
+        Row: {
+          active: boolean
+          agent_type: Database["public"]["Enums"]["agent_type"]
+          company_id: string
+          created_at: string
+          description: string
+          goal: string
+          id: string
+          is_default: boolean
+          knowledge: string
+          name: string
+          prompt: string
+          temperature: number
+          tone: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          agent_type?: Database["public"]["Enums"]["agent_type"]
+          company_id: string
+          created_at?: string
+          description?: string
+          goal?: string
+          id?: string
+          is_default?: boolean
+          knowledge?: string
+          name: string
+          prompt?: string
+          temperature?: number
+          tone?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          agent_type?: Database["public"]["Enums"]["agent_type"]
+          company_id?: string
+          created_at?: string
+          description?: string
+          goal?: string
+          id?: string
+          is_default?: boolean
+          knowledge?: string
+          name?: string
+          prompt?: string
+          temperature?: number
+          tone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_logs: {
         Row: {
           automation_id: string
@@ -135,6 +194,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          agent_id: string | null
           ai_enabled: boolean
           company_id: string
           created_at: string
@@ -145,6 +205,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_id?: string | null
           ai_enabled?: boolean
           company_id: string
           created_at?: string
@@ -155,6 +216,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_id?: string | null
           ai_enabled?: boolean
           company_id?: string
           created_at?: string
@@ -165,6 +227,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_company_id_fkey"
             columns: ["company_id"]
@@ -372,6 +441,13 @@ export type Database = {
       }
     }
     Enums: {
+      agent_type:
+        | "vendas"
+        | "atendimento"
+        | "suporte"
+        | "qualificacao"
+        | "agendamento"
+        | "custom"
       app_role: "admin" | "user"
       lead_status: "novo" | "atendimento" | "proposta" | "fechado"
       message_type: "enviada" | "recebida"
@@ -502,6 +578,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agent_type: [
+        "vendas",
+        "atendimento",
+        "suporte",
+        "qualificacao",
+        "agendamento",
+        "custom",
+      ],
       app_role: ["admin", "user"],
       lead_status: ["novo", "atendimento", "proposta", "fechado"],
       message_type: ["enviada", "recebida"],
