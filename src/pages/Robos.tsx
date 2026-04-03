@@ -113,7 +113,7 @@ export default function Robos() {
           company_id: companyId,
           name: form.name,
           description: form.description,
-          agent_type: form.agent_type as any,
+          agent_type: form.agent_type as "vendas" | "atendimento" | "suporte" | "qualificacao" | "agendamento" | "custom",
           prompt: form.prompt,
           tone: form.tone,
           goal: form.goal,
