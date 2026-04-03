@@ -60,9 +60,6 @@ export default function Settings() {
   useEffect(() => {
     if (company) {
       setCompanyName(company.name);
-      setWhatsappToken(company.whatsapp_token || "");
-      setPhoneId(company.whatsapp_phone_id || "");
-      setVerifyToken(company.whatsapp_verify_token || "");
     }
   }, [company]);
 
@@ -70,9 +67,6 @@ export default function Settings() {
     mutationFn: async () => {
       const { error } = await supabase.from("companies").update({
         name: companyName,
-        whatsapp_token: whatsappToken,
-        whatsapp_phone_id: phoneId,
-        whatsapp_verify_token: verifyToken,
       }).eq("id", companyId!);
       if (error) throw error;
     },
@@ -82,16 +76,6 @@ export default function Settings() {
     },
     onError: () => toast.error("Erro ao salvar"),
   });
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Copiado!");
-  };
-
-  const generateVerifyToken = () => {
-    const token = crypto.randomUUID().replace(/-/g, "").slice(0, 24);
-    setVerifyToken(token);
-  };
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
@@ -114,102 +98,41 @@ export default function Settings() {
       </Card>
 
       {isAdmin && (
-        <>
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                <div>
-                  <CardTitle>Equipe</CardTitle>
-                  <CardDescription>Membros da empresa e seus papéis</CardDescription>
-                </div>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              <div>
+                <CardTitle>Equipe</CardTitle>
+                <CardDescription>Membros da empresa e seus papéis</CardDescription>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {teamMembers.map((member) => (
-                <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      {member.role === "admin" ? (
-                        <ShieldCheck className="h-4 w-4 text-primary" />
-                      ) : (
-                        <User className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{member.full_name || "Sem nome"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Desde {new Date(member.created_at).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {teamMembers.map((member) => (
+              <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    {member.role === "admin" ? (
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                    ) : (
+                      <User className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </div>
-                  <Badge variant={member.role === "admin" ? "default" : "secondary"}>
-                    {member.role === "admin" ? "Admin" : "Usuário"}
-                  </Badge>
+                  <div>
+                    <p className="text-sm font-medium">{member.full_name || "Sem nome"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Desde {new Date(member.created_at).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp Business API</CardTitle>
-              <CardDescription>Configure a integração com o WhatsApp Cloud API da Meta</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Token de Acesso (Permanent Token)</Label>
-                <div className="relative">
-                  <Input
-                    type={showWhatsApp ? "text" : "password"}
-                    value={whatsappToken}
-                    onChange={(e) => setWhatsappToken(e.target.value)}
-                    placeholder="EAAxxxxxxx..."
-                  />
-                  <button type="button" onClick={() => setShowWhatsApp(!showWhatsApp)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showWhatsApp ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+                <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                  {member.role === "admin" ? "Admin" : "Usuário"}
+                </Badge>
               </div>
-
-              <div className="space-y-2">
-                <Label>Phone Number ID</Label>
-                <Input value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder="Ex: 1234567890" />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Verify Token (para validação do webhook)</Label>
-                <div className="flex gap-2">
-                  <Input value={verifyToken} onChange={(e) => setVerifyToken(e.target.value)} placeholder="Token de verificação" />
-                  <Button variant="outline" onClick={generateVerifyToken} type="button">Gerar</Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Webhook URL (cole no Meta Business)</Label>
-                <div className="flex gap-2">
-                  <Input value={webhookUrl} readOnly className="bg-muted text-sm" />
-                  <Button variant="outline" size="icon" onClick={() => handleCopy(webhookUrl)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Cole esta URL no Meta Business → WhatsApp → Configuração → Webhook. Use o Verify Token acima.
-                </p>
-              </div>
-
-              {whatsappToken && phoneId && verifyToken && (
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <CheckCircle className="h-4 w-4" />
-                  <span>WhatsApp configurado</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-
-
-        </>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {!isAdmin && (
@@ -223,7 +146,7 @@ export default function Settings() {
 
       {isAdmin && (
         <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
-          <Save className="h-4 w-4" /> {saveMutation.isPending ? "Salvando..." : "Salvar todas as configurações"}
+          <Save className="h-4 w-4" /> {saveMutation.isPending ? "Salvando..." : "Salvar configurações"}
         </Button>
       )}
     </div>
