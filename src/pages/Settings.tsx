@@ -30,7 +30,7 @@ export default function Settings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("companies")
-        .select("name, whatsapp_token, whatsapp_phone_id, whatsapp_verify_token, openai_api_key")
+        .select("name, whatsapp_token, whatsapp_phone_id, whatsapp_verify_token")
         .eq("id", companyId!)
         .single();
       if (error) throw error;
