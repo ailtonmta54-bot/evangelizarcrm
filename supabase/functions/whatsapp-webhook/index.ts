@@ -134,6 +134,43 @@ Deno.serve(async (req) => {
           }
           lead = newLead;
           console.log("New lead created:", lead.id, contactName);
+
+          // Trigger "novo_lead" automations
+          try {
+            const { data: novoLeadAutomations } = await supabase
+              .from("automations")
+              .select("*")
+              .eq("company_id", company.id)
+              .eq("trigger_type", "novo_lead")
+              .eq("active", true);
+
+            if (novoLeadAutomations && novoLeadAutomations.length > 0 && company.whatsapp_token && company.whatsapp_phone_id) {
+              for (const automation of novoLeadAutomations) {
+                const autoMessage = automation.message
+                  .replace(/\{nome\}/g, contactName)
+                  .replace(/\{telefone\}/g, fromNumber);
+
+                const autoSend = await sendWhatsAppMessage(
+                  company.whatsapp_token,
+                  company.whatsapp_phone_id,
+                  fromNumber,
+                  autoMessage
+                );
+
+                if (autoSend.ok) {
+                  await supabase.from("messages").insert({
+                    lead_id: lead.id,
+                    content: autoMessage,
+                    type: "enviada",
+                    company_id: company.id,
+                  });
+                  console.log("Novo lead automation sent:", automation.name);
+                }
+              }
+            }
+          } catch (autoError) {
+            console.error("Novo lead automation error:", autoError);
+          }
         }
 
         // Save incoming message
