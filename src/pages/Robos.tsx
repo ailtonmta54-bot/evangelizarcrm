@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Bot, Plus, Save, Trash2, Brain, MessageSquare,
   ShoppingCart, Headphones, CalendarCheck, Cog, Clock,
-  ArrowLeft, Send, Camera, Upload,
+  ArrowLeft, Send, Camera, Upload, Check,
   UsersRound, PhoneOff, VideoOff, AudioLines,
   Play, FlaskConical, Power, Copy, Globe,
 } from "lucide-react";
@@ -24,6 +24,26 @@ import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
+
+import avatarAtendimentoF from "@/assets/avatars/avatar-atendimento-f.png";
+import avatarVendasM from "@/assets/avatars/avatar-vendas-m.png";
+import avatarBot1 from "@/assets/avatars/avatar-bot-1.png";
+import avatarSuporteM from "@/assets/avatars/avatar-suporte-m.png";
+import avatarQualificacaoF from "@/assets/avatars/avatar-qualificacao-f.png";
+import avatarAgendamentoM from "@/assets/avatars/avatar-agendamento-m.png";
+import avatarBot2 from "@/assets/avatars/avatar-bot-2.png";
+import avatarVendasF from "@/assets/avatars/avatar-vendas-f.png";
+
+const avatarOptions = [
+  { src: avatarAtendimentoF, label: "Atendente" },
+  { src: avatarVendasM, label: "Vendedor" },
+  { src: avatarVendasF, label: "Vendedora" },
+  { src: avatarBot1, label: "Robô Amigável" },
+  { src: avatarBot2, label: "Robô Futurista" },
+  { src: avatarSuporteM, label: "Suporte" },
+  { src: avatarQualificacaoF, label: "Consultora" },
+  { src: avatarAgendamentoM, label: "Agendador" },
+];
 
 const agentTypeConfig = {
   vendas: { label: "Vendas", icon: ShoppingCart, color: "text-green-500" },
@@ -72,6 +92,7 @@ export default function Robos() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [configTab, setConfigTab] = useState("geral");
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Create form
@@ -218,7 +239,7 @@ export default function Robos() {
           </Button>
 
           {/* Avatar */}
-          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+          <div className="relative group cursor-pointer" onClick={() => setAvatarPickerOpen(true)}>
             <div className="h-16 w-16 rounded-xl overflow-hidden bg-muted flex items-center justify-center border-2 border-border">
               {(currentAgent as any).avatar_url ? (
                 <img src={(currentAgent as any).avatar_url} alt={currentAgent.name} className="h-full w-full object-cover" />
@@ -233,17 +254,19 @@ export default function Robos() {
             <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ${st.color} border-2 border-background flex items-center justify-center`}>
               <StatusIcon className="h-3 w-3 text-white" />
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadAvatar(file);
-              }}
-            />
           </div>
+
+          {/* Hidden file input for custom upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadAvatar(file);
+            }}
+          />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -752,6 +775,52 @@ export default function Robos() {
           <Plus className="h-4 w-4" /> Criar Robô
         </Button>
       </div>
+
+      {/* Avatar Picker Dialog */}
+      <Dialog open={avatarPickerOpen} onOpenChange={setAvatarPickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Escolha um avatar</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-4 gap-3">
+            {avatarOptions.map((opt, i) => {
+              const isSelected = (currentAgent as any)?.avatar_url === opt.src;
+              return (
+                <button
+                  key={i}
+                  className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all hover:scale-105 ${
+                    isSelected ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border hover:border-primary/50"
+                  }`}
+                  onClick={async () => {
+                    if (currentAgent) {
+                      await updateField.mutateAsync({ avatar_url: opt.src });
+                      toast.success("Avatar atualizado!");
+                      setAvatarPickerOpen(false);
+                    }
+                  }}
+                >
+                  <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted">
+                    <img src={opt.src} alt={opt.label} className="h-full w-full object-cover" loading="lazy" />
+                  </div>
+                  <span className="text-xs text-muted-foreground font-medium">{opt.label}</span>
+                  {isSelected && (
+                    <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Ou envie sua própria foto</p>
+            <Button variant="outline" size="sm" onClick={() => { setAvatarPickerOpen(false); fileInputRef.current?.click(); }}>
+              <Upload className="h-4 w-4 mr-1" /> Enviar foto
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog - simplified */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
