@@ -92,6 +92,7 @@ export default function Robos() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [configTab, setConfigTab] = useState("geral");
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Create form
