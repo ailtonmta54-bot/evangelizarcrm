@@ -239,7 +239,7 @@ export default function Robos() {
           </Button>
 
           {/* Avatar */}
-          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+          <div className="relative group cursor-pointer" onClick={() => setAvatarPickerOpen(true)}>
             <div className="h-16 w-16 rounded-xl overflow-hidden bg-muted flex items-center justify-center border-2 border-border">
               {(currentAgent as any).avatar_url ? (
                 <img src={(currentAgent as any).avatar_url} alt={currentAgent.name} className="h-full w-full object-cover" />
@@ -254,17 +254,19 @@ export default function Robos() {
             <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ${st.color} border-2 border-background flex items-center justify-center`}>
               <StatusIcon className="h-3 w-3 text-white" />
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadAvatar(file);
-              }}
-            />
           </div>
+
+          {/* Hidden file input for custom upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadAvatar(file);
+            }}
+          />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
