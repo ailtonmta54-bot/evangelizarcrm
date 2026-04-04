@@ -321,6 +321,50 @@ export default function Robos() {
 
           {/* === GERAL === */}
           <TabsContent value="geral" className="space-y-6 mt-4">
+            {/* Avatar Gallery Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2"><Camera className="h-4 w-4" /> Avatar do Robô</CardTitle>
+                <CardDescription>Escolha um avatar estilo cartão para o seu robô</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                  {avatarOptions.map((opt, i) => {
+                    const isSelected = (currentAgent as any)?.avatar_url === opt.src;
+                    return (
+                      <button
+                        key={i}
+                        className={`relative flex flex-col items-center gap-1 p-1.5 rounded-xl border-2 transition-all hover:scale-105 ${
+                          isSelected ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border hover:border-primary/50"
+                        }`}
+                        onClick={async () => {
+                          await updateField.mutateAsync({ avatar_url: opt.src });
+                          toast.success("Avatar atualizado!");
+                        }}
+                      >
+                        <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted">
+                          <img src={opt.src} alt={opt.label} className="h-full w-full object-cover" loading="lazy" />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-medium leading-tight text-center">{opt.label}</span>
+                        {isSelected && (
+                          <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                            <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Separator className="my-3" />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Ou envie sua própria foto</p>
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="h-3 w-3 mr-1" /> Enviar foto
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader className="pb-3">
