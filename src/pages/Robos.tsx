@@ -776,6 +776,52 @@ export default function Robos() {
         </Button>
       </div>
 
+      {/* Avatar Picker Dialog */}
+      <Dialog open={avatarPickerOpen} onOpenChange={setAvatarPickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Escolha um avatar</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-4 gap-3">
+            {avatarOptions.map((opt, i) => {
+              const isSelected = (currentAgent as any)?.avatar_url === opt.src;
+              return (
+                <button
+                  key={i}
+                  className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all hover:scale-105 ${
+                    isSelected ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border hover:border-primary/50"
+                  }`}
+                  onClick={async () => {
+                    if (currentAgent) {
+                      await updateField.mutateAsync({ avatar_url: opt.src });
+                      toast.success("Avatar atualizado!");
+                      setAvatarPickerOpen(false);
+                    }
+                  }}
+                >
+                  <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted">
+                    <img src={opt.src} alt={opt.label} className="h-full w-full object-cover" loading="lazy" />
+                  </div>
+                  <span className="text-xs text-muted-foreground font-medium">{opt.label}</span>
+                  {isSelected && (
+                    <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Ou envie sua própria foto</p>
+            <Button variant="outline" size="sm" onClick={() => { setAvatarPickerOpen(false); fileInputRef.current?.click(); }}>
+              <Upload className="h-4 w-4 mr-1" /> Enviar foto
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Create Dialog - simplified */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-md">
