@@ -803,6 +803,17 @@ export default function Robos() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Botão Salvar */}
+        <div className="flex justify-end pt-4 border-t border-border">
+          <Button
+            onClick={() => toast.success("Todas as alterações foram salvas!")}
+            className="gap-2"
+          >
+            <Save className="h-4 w-4" />
+            Salvar Alterações
+          </Button>
+        </div>
       </div>
     );
   }
