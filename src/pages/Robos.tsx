@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Bot, Plus, Save, Trash2, Brain, MessageSquare,
   ShoppingCart, Headphones, CalendarCheck, Cog, Clock,
-  ArrowLeft, Send, Camera, Upload,
+  ArrowLeft, Send, Camera, Upload, Check,
   UsersRound, PhoneOff, VideoOff, AudioLines,
   Play, FlaskConical, Power, Copy, Globe,
 } from "lucide-react";
@@ -24,6 +24,26 @@ import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
+
+import avatarAtendimentoF from "@/assets/avatars/avatar-atendimento-f.png";
+import avatarVendasM from "@/assets/avatars/avatar-vendas-m.png";
+import avatarBot1 from "@/assets/avatars/avatar-bot-1.png";
+import avatarSuporteM from "@/assets/avatars/avatar-suporte-m.png";
+import avatarQualificacaoF from "@/assets/avatars/avatar-qualificacao-f.png";
+import avatarAgendamentoM from "@/assets/avatars/avatar-agendamento-m.png";
+import avatarBot2 from "@/assets/avatars/avatar-bot-2.png";
+import avatarVendasF from "@/assets/avatars/avatar-vendas-f.png";
+
+const avatarOptions = [
+  { src: avatarAtendimentoF, label: "Atendente" },
+  { src: avatarVendasM, label: "Vendedor" },
+  { src: avatarVendasF, label: "Vendedora" },
+  { src: avatarBot1, label: "Robô Amigável" },
+  { src: avatarBot2, label: "Robô Futurista" },
+  { src: avatarSuporteM, label: "Suporte" },
+  { src: avatarQualificacaoF, label: "Consultora" },
+  { src: avatarAgendamentoM, label: "Agendador" },
+];
 
 const agentTypeConfig = {
   vendas: { label: "Vendas", icon: ShoppingCart, color: "text-green-500" },
