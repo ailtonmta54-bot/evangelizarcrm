@@ -15,6 +15,7 @@ import Robos from "./pages/Robos";
 import Automacoes from "./pages/Automacoes";
 import Produtos from "./pages/Produtos";
 import Settings from "./pages/Settings";
+import Contatos from "./pages/Contatos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/inbox" element={<Inbox />} />
+                <Route path="/contatos" element={<Contatos />} />
                 <Route path="/crm" element={<Crm />} />
                 <Route path="/robos" element={<Robos />} />
                 <Route path="/automacoes" element={<Automacoes />} />
