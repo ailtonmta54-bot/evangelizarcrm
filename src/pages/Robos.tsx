@@ -150,7 +150,7 @@ export default function Robos() {
   const updateField = useMutation({
     mutationFn: async (updates: Record<string, any>) => {
       if (!currentAgent) return;
-      const { error } = await supabase.from("agents").update(updates).eq("id", currentAgent.id);
+      const { error } = await supabase.from("agents").update(updates as any).eq("id", currentAgent.id);
       if (error) throw error;
     },
     onSuccess: () => {
