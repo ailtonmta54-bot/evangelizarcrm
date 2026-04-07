@@ -13,6 +13,7 @@ import Inbox from "./pages/Inbox";
 import Crm from "./pages/Crm";
 import Robos from "./pages/Robos";
 import Automacoes from "./pages/Automacoes";
+import FlowEditor from "./pages/FlowEditor";
 import Produtos from "./pages/Produtos";
 import Settings from "./pages/Settings";
 import Contatos from "./pages/Contatos";
@@ -39,6 +40,7 @@ const App = () => (
                 <Route path="/crm" element={<Crm />} />
                 <Route path="/robos" element={<Robos />} />
                 <Route path="/automacoes" element={<Automacoes />} />
+                <Route path="/automacoes/flow/:flowId" element={<FlowEditor />} />
                 <Route path="/produtos" element={<Produtos />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
