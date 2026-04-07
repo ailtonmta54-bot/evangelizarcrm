@@ -11,10 +11,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lead_id, company_id, agent_id } = await req.json();
+    const { lead_id, company_id, agent_id, test_mode, test_message, test_history } = await req.json();
 
-    if (!lead_id || !company_id) {
-      return new Response(JSON.stringify({ error: "lead_id and company_id required" }), {
+    if (!company_id) {
+      return new Response(JSON.stringify({ error: "company_id required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!test_mode && !lead_id) {
+      return new Response(JSON.stringify({ error: "lead_id required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -34,21 +41,47 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get lead info
-    const { data: lead } = await supabase
-      .from("leads")
-      .select("name, phone, ai_enabled, agent_id")
-      .eq("id", lead_id)
-      .single();
+    let lead = null;
+    let history: any[] = [];
 
-    if (!lead?.ai_enabled) {
-      return new Response(JSON.stringify({ skipped: true, reason: "AI disabled for this lead" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (test_mode) {
+      // In test mode, use test data directly
+      lead = { name: "Usuário Teste", phone: "0000", ai_enabled: true, agent_id: agent_id };
+      history = (test_history || []).map((msg: any) => ({
+        content: msg.content,
+        type: msg.role === "user" ? "recebida" : "enviada",
+        created_at: new Date().toISOString(),
+      }));
+      // Add the current test message
+      if (test_message) {
+        history.push({ content: test_message, type: "recebida", created_at: new Date().toISOString() });
+      }
+    } else {
+      // Production mode - fetch from DB
+      const { data: leadData } = await supabase
+        .from("leads")
+        .select("name, phone, ai_enabled, agent_id")
+        .eq("id", lead_id)
+        .single();
+
+      if (!leadData?.ai_enabled) {
+        return new Response(JSON.stringify({ skipped: true, reason: "AI disabled for this lead" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      lead = leadData;
+
+      const { data: msgHistory } = await supabase
+        .from("messages")
+        .select("content, type, created_at")
+        .eq("lead_id", lead_id)
+        .order("created_at", { ascending: true })
+        .limit(20);
+      history = msgHistory || [];
     }
 
-    // Get agent - use provided agent_id, then lead's agent, then default
+    // Get agent
     let agent = null;
     const targetAgentId = agent_id || lead.agent_id;
 
@@ -76,20 +109,12 @@ Deno.serve(async (req) => {
       agent = data;
     }
 
-    if (!agent || !agent.active) {
-      return new Response(JSON.stringify({ skipped: true, reason: "No active agent found" }), {
-        status: 200,
+    if (!agent) {
+      return new Response(JSON.stringify({ error: "No agent found" }), {
+        status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Get conversation history (last 20 messages)
-    const { data: history } = await supabase
-      .from("messages")
-      .select("content, type, created_at")
-      .eq("lead_id", lead_id)
-      .order("created_at", { ascending: true })
-      .limit(20);
 
     const toneMap: Record<string, string> = {
       formal: "Seja formal e profissional.",
@@ -127,7 +152,7 @@ Regras importantes:
 
     const aiMessages = [
       { role: "system", content: systemPrompt },
-      ...(history || []).map((msg: any) => ({
+      ...history.map((msg: any) => ({
         role: msg.type === "recebida" ? "user" : "assistant",
         content: msg.content,
       })),
@@ -166,7 +191,7 @@ Regras importantes:
       });
     }
 
-    console.log(`Agent "${agent.name}" response for lead ${lead_id}:`, generatedMessage);
+    console.log(`Agent "${agent.name}" response:`, generatedMessage);
 
     return new Response(
       JSON.stringify({ success: true, message: generatedMessage, agent_name: agent.name }),
