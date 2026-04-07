@@ -116,6 +116,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Fetch company products for context
+    const { data: products } = await supabase
+      .from("products")
+      .select("name, description, price, external_link")
+      .eq("company_id", company_id);
+
+    let productsBlock = "";
+    if (products && products.length > 0) {
+      const productList = products.map((p: any) =>
+        `- ${p.name}: ${p.description || "Sem descrição"} | R$ ${Number(p.price).toFixed(2)}${p.external_link ? ` | Link: ${p.external_link}` : ""}`
+      ).join("\n");
+      productsBlock = `\n\nCatálogo de produtos/serviços disponíveis:\n${productList}\n\nRegras sobre produtos:\n- Se o cliente demonstrar desinteresse em um produto, ofereça alternativas do catálogo\n- Mencione preços quando relevante\n- Se houver link externo, compartilhe quando o cliente demonstrar interesse`;
+    }
+
     const toneMap: Record<string, string> = {
       formal: "Seja formal e profissional.",
       persuasivo: "Seja persuasivo e convincente, destaque benefícios.",
@@ -138,6 +152,7 @@ Deno.serve(async (req) => {
 
 ${agent.prompt}
 ${knowledgeBlock}
+${productsBlock}
 
 ${toneMap[agent.tone] || toneMap.amigavel}
 ${goalMap[agent.goal] || goalMap.qualificar}
@@ -148,7 +163,8 @@ Regras importantes:
 - Não se identifique como IA ou robô
 - Use o nome do cliente quando possível: ${lead.name}
 - Sempre termine com uma pergunta ou call-to-action
-- Respeite o contexto da conversa anterior`;
+- Respeite o contexto da conversa anterior
+- Se o cliente recusar um produto, sugira alternativas do catálogo disponível`;
 
     const aiMessages = [
       { role: "system", content: systemPrompt },
