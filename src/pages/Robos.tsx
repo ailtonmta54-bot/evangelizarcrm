@@ -601,6 +601,54 @@ export default function Robos() {
             </Card>
           </TabsContent>
 
+          {/* === PRODUTOS === */}
+          <TabsContent value="produtos" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Produtos vinculados</CardTitle>
+                <CardDescription>Selecione os produtos que este robô pode oferecer. Ele usará os preços e descrições cadastrados.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {products.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-8 text-center">
+                    <ShoppingCart className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                    <p className="text-sm font-medium mb-1">Nenhum produto cadastrado</p>
+                    <p className="text-xs text-muted-foreground mb-4">Cadastre seus produtos na aba "Produtos" do menu lateral</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {products.map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                      >
+                        <Checkbox
+                          checked={true}
+                          disabled
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{product.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{product.description || "Sem descrição"}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold">R$ {Number(product.price).toFixed(2)}</p>
+                          {product.external_link && (
+                            <a href={product.external_link} target="_blank" rel="noopener" className="text-xs text-primary hover:underline">
+                              Ver link
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground pt-2">
+                      Todos os produtos da empresa são automaticamente acessíveis pelo robô. Para adicionar ou editar produtos, vá em <strong>Produtos</strong> no menu lateral.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* === GATILHOS === */}
           <TabsContent value="gatilhos" className="space-y-6 mt-4">
             <Card>
