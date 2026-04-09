@@ -314,9 +314,10 @@ export default function Robos() {
 
         {/* Config Tabs */}
         <Tabs value={configTab} onValueChange={setConfigTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="geral">Geral</TabsTrigger>
             <TabsTrigger value="treinamento">Treinamento</TabsTrigger>
+            <TabsTrigger value="produtos">Produtos</TabsTrigger>
             <TabsTrigger value="gatilhos">Gatilhos</TabsTrigger>
             <TabsTrigger value="integracoes">Integrações</TabsTrigger>
             <TabsTrigger value="teste">Chat Teste</TabsTrigger>
