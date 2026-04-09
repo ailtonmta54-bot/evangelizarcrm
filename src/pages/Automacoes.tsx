@@ -146,7 +146,7 @@ export default function Automacoes() {
                     </div>
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <Switch checked={flow.active} onCheckedChange={(checked) => toggleFlowMutation.mutate({ id: flow.id, active: checked })} />
-                      <Button variant="ghost" size="icon" onClick={() => deleteFlowMutation.mutate(flow.id)}>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (confirm("Tem certeza que deseja excluir este fluxo?")) deleteFlowMutation.mutate(flow.id); }}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -250,7 +250,7 @@ export default function Automacoes() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Switch checked={auto.active} onCheckedChange={(checked) => toggleMutation.mutate({ id: auto.id, active: checked })} />
-                      <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(auto.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (confirm("Tem certeza que deseja excluir esta automação?")) deleteMutation.mutate(auto.id); }}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </CardContent>
                 </Card>
