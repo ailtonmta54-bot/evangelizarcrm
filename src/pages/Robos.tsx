@@ -18,6 +18,7 @@ import {
   ArrowLeft, Send, Camera, Upload, Check,
   UsersRound, PhoneOff, VideoOff, AudioLines,
   Play, FlaskConical, Power, Copy, Globe,
+  FileText, FileUp, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { WhatsAppIcon, ElevenLabsIcon, GoogleCalendarIcon } from "@/components/BrandIcons";
 import { toast } from "sonner";
