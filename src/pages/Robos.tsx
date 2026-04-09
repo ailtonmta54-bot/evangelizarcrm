@@ -671,7 +671,10 @@ export default function Robos() {
           {/* === INTEGRAÇÕES === */}
           <TabsContent value="integracoes" className="space-y-4 mt-4">
             {/* WhatsApp */}
-            <Card>
+            <Card
+              className="cursor-pointer transition-all hover:border-primary/30"
+              onClick={() => setExpandedIntegration(expandedIntegration === "whatsapp" ? null : "whatsapp")}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${currentAgent.whatsapp_phone_id ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"}`}>
@@ -684,48 +687,54 @@ export default function Robos() {
                   <Badge variant={currentAgent.whatsapp_phone_id ? "default" : "secondary"} className="text-xs">
                     {currentAgent.whatsapp_phone_id ? "Conectado" : "Não configurado"}
                   </Badge>
+                  {expandedIntegration === "whatsapp" ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label className="text-xs">Token de Acesso</Label>
-                  <Input
-                    type="password"
-                    defaultValue={currentAgent.whatsapp_token || ""}
-                    onBlur={(e) => saveField("whatsapp_token", e.target.value)}
-                    placeholder="Token da API Meta"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Phone Number ID</Label>
-                  <Input
-                    defaultValue={currentAgent.whatsapp_phone_id || ""}
-                    onBlur={(e) => saveField("whatsapp_phone_id", e.target.value)}
-                    placeholder="ID do número"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Verify Token</Label>
-                  <Input
-                    defaultValue={currentAgent.whatsapp_verify_token || ""}
-                    onBlur={(e) => saveField("whatsapp_verify_token", e.target.value)}
-                    placeholder="Token de verificação"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">URL do Webhook</Label>
-                  <div className="flex gap-2">
-                    <Input readOnly value={webhookUrl} className="bg-muted text-xs font-mono" />
-                    <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(webhookUrl); toast.success("URL copiada!"); }}>
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+              {expandedIntegration === "whatsapp" && (
+                <CardContent className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Token de Acesso</Label>
+                    <Input
+                      type="password"
+                      defaultValue={currentAgent.whatsapp_token || ""}
+                      onBlur={(e) => saveField("whatsapp_token", e.target.value)}
+                      placeholder="Token da API Meta"
+                    />
                   </div>
-                </div>
-              </CardContent>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Phone Number ID</Label>
+                    <Input
+                      defaultValue={currentAgent.whatsapp_phone_id || ""}
+                      onBlur={(e) => saveField("whatsapp_phone_id", e.target.value)}
+                      placeholder="ID do número"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Verify Token</Label>
+                    <Input
+                      defaultValue={currentAgent.whatsapp_verify_token || ""}
+                      onBlur={(e) => saveField("whatsapp_verify_token", e.target.value)}
+                      placeholder="Token de verificação"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">URL do Webhook</Label>
+                    <div className="flex gap-2">
+                      <Input readOnly value={webhookUrl} className="bg-muted text-xs font-mono" />
+                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(webhookUrl); toast.success("URL copiada!"); }}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
             </Card>
 
             {/* ElevenLabs */}
-            <Card>
+            <Card
+              className="cursor-pointer transition-all hover:border-primary/30"
+              onClick={() => setExpandedIntegration(expandedIntegration === "elevenlabs" ? null : "elevenlabs")}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${currentAgent.elevenlabs_enabled ? "bg-purple-500/10 text-purple-500" : "bg-muted text-muted-foreground"}`}>
@@ -737,12 +746,14 @@ export default function Robos() {
                   </div>
                   <Switch
                     checked={currentAgent.elevenlabs_enabled ?? false}
-                    onCheckedChange={(v) => saveField("elevenlabs_enabled", v)}
+                    onCheckedChange={(v) => { v ? setExpandedIntegration("elevenlabs") : null; saveField("elevenlabs_enabled", v); }}
+                    onClick={(e) => e.stopPropagation()}
                   />
+                  {expandedIntegration === "elevenlabs" ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 </div>
               </CardHeader>
-              {currentAgent.elevenlabs_enabled && (
-                <CardContent className="space-y-3">
+              {expandedIntegration === "elevenlabs" && (
+                <CardContent className="space-y-3" onClick={(e) => e.stopPropagation()}>
                   <div className="space-y-2">
                     <Label className="text-xs">Voice ID</Label>
                     <Input
@@ -759,7 +770,10 @@ export default function Robos() {
             </Card>
 
             {/* Google Calendar */}
-            <Card>
+            <Card
+              className="cursor-pointer transition-all hover:border-primary/30"
+              onClick={() => setExpandedIntegration(expandedIntegration === "calendar" ? null : "calendar")}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${currentAgent.google_calendar_enabled ? "bg-blue-500/10 text-blue-500" : "bg-muted text-muted-foreground"}`}>
@@ -771,12 +785,14 @@ export default function Robos() {
                   </div>
                   <Switch
                     checked={currentAgent.google_calendar_enabled ?? false}
-                    onCheckedChange={(v) => saveField("google_calendar_enabled", v)}
+                    onCheckedChange={(v) => { v ? setExpandedIntegration("calendar") : null; saveField("google_calendar_enabled", v); }}
+                    onClick={(e) => e.stopPropagation()}
                   />
+                  {expandedIntegration === "calendar" ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 </div>
               </CardHeader>
-              {currentAgent.google_calendar_enabled && (
-                <CardContent className="space-y-3">
+              {expandedIntegration === "calendar" && (
+                <CardContent className="space-y-3" onClick={(e) => e.stopPropagation()}>
                   <div className="space-y-2">
                     <Label className="text-xs">Calendar ID</Label>
                     <Input
