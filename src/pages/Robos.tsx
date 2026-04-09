@@ -132,6 +132,7 @@ export default function Robos() {
       return data;
     },
     enabled: !!companyId,
+  });
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
 
