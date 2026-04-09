@@ -93,6 +93,8 @@ export default function Robos() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [configTab, setConfigTab] = useState("geral");
+  const [trainingTab, setTrainingTab] = useState("texto");
+  const [expandedIntegration, setExpandedIntegration] = useState<string | null>(null);
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
