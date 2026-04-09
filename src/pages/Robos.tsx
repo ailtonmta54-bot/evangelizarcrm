@@ -121,6 +121,18 @@ export default function Robos() {
     enabled: !!companyId,
   });
 
+  const { data: products = [] } = useQuery({
+    queryKey: ["products", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId,
+
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
 
   const currentAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
