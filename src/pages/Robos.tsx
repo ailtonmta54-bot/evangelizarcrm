@@ -503,29 +503,86 @@ export default function Robos() {
           <TabsContent value="treinamento" className="space-y-6 mt-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2"><Brain className="h-4 w-4" /> Prompt & Conhecimento</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><Brain className="h-4 w-4" /> Prompt principal</CardTitle>
+                <CardDescription>Descreva o comportamento, personalidade e regras do robô</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Prompt principal (Treinamento)</Label>
-                  <Textarea
-                    rows={8}
-                    defaultValue={currentAgent.prompt}
-                    onBlur={(e) => saveField("prompt", e.target.value)}
-                    placeholder="Descreva o comportamento do robô, personalidade, regras..."
-                  />
-                  <p className="text-xs text-muted-foreground">Quanto mais detalhado, melhor será o atendimento.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Base de conhecimento</Label>
-                  <Textarea
-                    rows={8}
-                    defaultValue={currentAgent.knowledge}
-                    onBlur={(e) => saveField("knowledge", e.target.value)}
-                    placeholder="FAQ, catálogo de produtos, preços, scripts de vendas, informações da empresa..."
-                  />
-                  <p className="text-xs text-muted-foreground">Informações que o robô terá acesso para responder.</p>
-                </div>
+              <CardContent>
+                <Textarea
+                  rows={6}
+                  defaultValue={currentAgent.prompt}
+                  onBlur={(e) => saveField("prompt", e.target.value)}
+                  placeholder="Descreva o comportamento do robô, personalidade, regras..."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2"><Brain className="h-4 w-4" /> Base de Conhecimento</CardTitle>
+                <CardDescription>Adicione informações para o robô consultar durante as conversas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={trainingTab} onValueChange={setTrainingTab}>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="texto" className="gap-1.5">
+                      <FileText className="h-3.5 w-3.5" /> Texto
+                    </TabsTrigger>
+                    <TabsTrigger value="website" className="gap-1.5">
+                      <Globe className="h-3.5 w-3.5" /> Website
+                    </TabsTrigger>
+                    <TabsTrigger value="documento" className="gap-1.5">
+                      <FileUp className="h-3.5 w-3.5" /> Documento
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="texto" className="mt-4 space-y-2">
+                    <Textarea
+                      rows={8}
+                      maxLength={1000}
+                      defaultValue={currentAgent.knowledge}
+                      onBlur={(e) => saveField("knowledge", e.target.value)}
+                      placeholder="FAQ, catálogo de produtos, preços, scripts de vendas, informações da empresa..."
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Pequenos conhecimentos, FAQ, informações rápidas</span>
+                      <span>{(currentAgent.knowledge || "").length}/1000</span>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="website" className="mt-4 space-y-4">
+                    <div className="space-y-2">
+                      <Label>URL do site</Label>
+                      <div className="flex gap-2">
+                        <Input placeholder="https://www.seusite.com.br" />
+                        <Button variant="outline" className="shrink-0 gap-1.5">
+                          <Globe className="h-4 w-4" /> Ler site
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        O robô irá ler o conteúdo do site e usar como base de conhecimento para responder.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      <Globe className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                      <p>Insira uma URL acima e clique em "Ler site"</p>
+                      <p className="text-xs mt-1">O conteúdo será extraído e adicionado à base de conhecimento</p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="documento" className="mt-4 space-y-4">
+                    <div className="rounded-lg border border-dashed p-8 text-center">
+                      <FileUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-sm font-medium mb-1">Envie um documento</p>
+                      <p className="text-xs text-muted-foreground mb-4">PDF ou DOCX com até 10MB</p>
+                      <Button variant="outline" className="gap-1.5">
+                        <Upload className="h-4 w-4" /> Selecionar arquivo
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      O conteúdo do documento será extraído e usado como base de conhecimento do robô.
+                    </p>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>
