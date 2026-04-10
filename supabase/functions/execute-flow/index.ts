@@ -218,6 +218,53 @@ Deno.serve(async (req) => {
           break;
         }
 
+        case "send_media": {
+          const mediaType = (data as any).mediaType || "image";
+          const mediaUrl = (data as any).mediaUrl || "";
+          const caption = replacePlaceholders((data as any).mediaCaption || "");
+          if (mediaUrl) {
+            await sendWhatsAppMedia(lead.phone, mediaType, mediaUrl, caption);
+            executionLog.push(`  → Sent ${mediaType}: ${mediaUrl.substring(0, 40)}...`);
+          }
+          break;
+        }
+
+        case "buttons": {
+          const bodyText = replacePlaceholders((data as any).buttonText || "Escolha:");
+          const buttons = ((data as any).buttonOptions || []).filter(Boolean);
+          if (buttons.length > 0) {
+            await sendWhatsAppButtons(lead.phone, bodyText, buttons);
+            executionLog.push(`  → Sent buttons: ${buttons.join(", ")}`);
+          }
+          break;
+        }
+
+        case "webhook": {
+          const webhookUrl = (data as any).webhookUrl;
+          const method = (data as any).webhookMethod || "POST";
+          if (webhookUrl) {
+            let headers: Record<string, string> = { "Content-Type": "application/json" };
+            try {
+              const custom = JSON.parse((data as any).webhookHeaders || "{}");
+              headers = { ...headers, ...custom };
+            } catch {}
+            const webhookBody = JSON.stringify({
+              lead_id, lead_name: lead.name, lead_phone: lead.phone,
+              lead_status: lead.status, company_id,
+              timestamp: new Date().toISOString(),
+            });
+            try {
+              await fetch(webhookUrl, {
+                method, headers, ...(method === "POST" ? { body: webhookBody } : {}),
+              });
+              executionLog.push(`  → Webhook ${method}: ${webhookUrl.substring(0, 40)}...`);
+            } catch (err) {
+              executionLog.push(`  → Webhook failed: ${err}`);
+            }
+          }
+          break;
+        }
+
         case "delay": {
           const value = parseInt((data as any).delayValue || "1");
           const unit = (data as any).delayUnit || "hours";
