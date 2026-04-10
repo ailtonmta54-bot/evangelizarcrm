@@ -836,7 +836,70 @@ export default function Robos() {
               )}
             </Card>
 
-            {/* ElevenLabs */}
+            {/* Z-API */}
+            <Card
+              className="cursor-pointer transition-all hover:border-primary/30"
+              onClick={() => setExpandedIntegration(expandedIntegration === "zapi" ? null : "zapi")}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${(currentAgent as any).zapi_enabled ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
+                    <Globe className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-sm">Z-API</CardTitle>
+                    <CardDescription className="text-xs">WhatsApp não-oficial via Z-API</CardDescription>
+                  </div>
+                  <Badge variant={(currentAgent as any).zapi_enabled ? "default" : "secondary"} className="text-xs">
+                    {(currentAgent as any).zapi_enabled ? "Conectado" : "Não configurado"}
+                  </Badge>
+                  {expandedIntegration === "zapi" ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              </CardHeader>
+              {expandedIntegration === "zapi" && (
+                <CardContent className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Instance ID</Label>
+                    <Input
+                      defaultValue={(currentAgent as any).zapi_instance_id || ""}
+                      onBlur={(e) => saveField("zapi_instance_id" as any, e.target.value)}
+                      placeholder="ID da instância Z-API"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Token</Label>
+                    <Input
+                      type="password"
+                      defaultValue={(currentAgent as any).zapi_token || ""}
+                      onBlur={(e) => saveField("zapi_token" as any, e.target.value)}
+                      placeholder="Token da instância"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={(currentAgent as any).zapi_enabled || false}
+                      onCheckedChange={(v) => saveField("zapi_enabled" as any, v)}
+                    />
+                    <Label className="text-xs">Ativar Z-API</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Provedor WhatsApp</Label>
+                    <Select
+                      value={(currentAgent as any).whatsapp_provider || "official"}
+                      onValueChange={(v) => saveField("whatsapp_provider" as any, v)}
+                    >
+                      <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="official">API Oficial (Meta)</SelectItem>
+                        <SelectItem value="zapi">Z-API</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Escolha qual API usar para enviar mensagens</p>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+
             <Card
               className="cursor-pointer transition-all hover:border-primary/30"
               onClick={() => setExpandedIntegration(expandedIntegration === "elevenlabs" ? null : "elevenlabs")}
