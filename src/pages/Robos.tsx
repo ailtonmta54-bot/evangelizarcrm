@@ -108,6 +108,11 @@ export default function Robos() {
   const [testInput, setTestInput] = useState("");
   const [testLoading, setTestLoading] = useState(false);
 
+  // Website scraping
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [websiteLoading, setWebsiteLoading] = useState(false);
+  const [websiteContent, setWebsiteContent] = useState<string | null>(null);
+
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ["agents", companyId],
     queryFn: async () => {
