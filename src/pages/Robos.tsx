@@ -621,11 +621,10 @@ export default function Robos() {
                             setWebsiteLoading(true);
                             setWebsiteContent(null);
                             try {
-                              const { data, error } = await supabase.functions.invoke("scrape-website", {
+                              const { data } = await supabase.functions.invoke("scrape-website", {
                                 body: { url: websiteUrl.trim() },
                               });
-                              if (error) throw error;
-                              if (data?.error) throw new Error(data.error);
+                              if (!data?.ok) throw new Error(data?.error || "Erro ao ler o site");
                               const content = data.content || "";
                               setWebsiteContent(content);
                               // Append to existing knowledge
