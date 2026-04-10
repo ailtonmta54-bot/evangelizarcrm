@@ -178,6 +178,93 @@ export function NodeConfigPanel({ node, onUpdate, onClose, onDelete, agents }: N
         </div>
       )}
 
+      {nodeType === "send_media" && (
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label>Tipo de mídia</Label>
+            <Select value={(node.data.mediaType as string) || "image"} onValueChange={(v) => update("mediaType", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="image">Imagem</SelectItem>
+                <SelectItem value="video">Vídeo</SelectItem>
+                <SelectItem value="audio">Áudio</SelectItem>
+                <SelectItem value="document">Documento</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>URL da mídia</Label>
+            <Input value={(node.data.mediaUrl as string) || ""} onChange={(e) => update("mediaUrl", e.target.value)}
+              placeholder="https://exemplo.com/imagem.jpg"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Legenda (opcional)</Label>
+            <Textarea value={(node.data.mediaCaption as string) || ""} onChange={(e) => update("mediaCaption", e.target.value)}
+              placeholder="Texto que acompanha a mídia" rows={2}
+            />
+          </div>
+        </div>
+      )}
+
+      {nodeType === "buttons" && (
+        <div className="space-y-3">
+          <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800">
+            <p className="text-xs text-violet-700 dark:text-violet-300">
+              Envia uma mensagem com botões interativos. O lead clica e a resposta é usada nas condições/roteador.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Texto da mensagem</Label>
+            <Textarea value={(node.data.buttonText as string) || ""} onChange={(e) => update("buttonText", e.target.value)}
+              placeholder="Escolha uma opção:" rows={2}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Botões (máx. 3)</Label>
+            {((node.data.buttonOptions as string[]) || ["", "", ""]).map((btn: string, i: number) => (
+              <Input key={i} value={btn} onChange={(e) => {
+                const opts = [...((node.data.buttonOptions as string[]) || ["", "", ""])];
+                opts[i] = e.target.value;
+                update("buttonOptions", opts);
+              }} placeholder={`Botão ${i + 1} (ex: ${i === 0 ? "Sim" : i === 1 ? "Não" : "Mais info"})`} className="text-xs h-8" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {nodeType === "webhook" && (
+        <div className="space-y-3">
+          <div className="p-2 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800">
+            <p className="text-xs text-yellow-700 dark:text-yellow-300">
+              Envia dados do lead para uma URL externa (Zapier, Make, N8N, etc).
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>URL do Webhook</Label>
+            <Input value={(node.data.webhookUrl as string) || ""} onChange={(e) => update("webhookUrl", e.target.value)}
+              placeholder="https://hooks.zapier.com/..." 
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Método</Label>
+            <Select value={(node.data.webhookMethod as string) || "POST"} onValueChange={(v) => update("webhookMethod", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="POST">POST</SelectItem>
+                <SelectItem value="GET">GET</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Headers personalizados (JSON, opcional)</Label>
+            <Textarea value={(node.data.webhookHeaders as string) || ""} onChange={(e) => update("webhookHeaders", e.target.value)}
+              placeholder='{"Authorization": "Bearer xxx"}' rows={2} className="font-mono text-xs"
+            />
+          </div>
+        </div>
+      )}
+
       {nodeType === "assign_agent" && (
         <div className="space-y-2">
           <Label>Agente/Robô</Label>
