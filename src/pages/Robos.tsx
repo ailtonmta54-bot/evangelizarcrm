@@ -108,6 +108,11 @@ export default function Robos() {
   const [testInput, setTestInput] = useState("");
   const [testLoading, setTestLoading] = useState(false);
 
+  // Website scraping
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [websiteLoading, setWebsiteLoading] = useState(false);
+  const [websiteContent, setWebsiteContent] = useState<string | null>(null);
+
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ["agents", companyId],
     queryFn: async () => {
@@ -603,20 +608,69 @@ export default function Robos() {
                     <div className="space-y-2">
                       <Label>URL do site</Label>
                       <div className="flex gap-2">
-                        <Input placeholder="https://www.seusite.com.br" />
-                        <Button variant="outline" className="shrink-0 gap-1.5">
-                          <Globe className="h-4 w-4" /> Ler site
+                        <Input
+                          placeholder="https://www.seusite.com.br"
+                          value={websiteUrl}
+                          onChange={(e) => setWebsiteUrl(e.target.value)}
+                        />
+                        <Button
+                          variant="outline"
+                          className="shrink-0 gap-1.5"
+                          disabled={websiteLoading || !websiteUrl.trim()}
+                          onClick={async () => {
+                            setWebsiteLoading(true);
+                            setWebsiteContent(null);
+                            try {
+                              const { data, error } = await supabase.functions.invoke("scrape-website", {
+                                body: { url: websiteUrl.trim() },
+                              });
+                              if (error) throw error;
+                              if (data?.error) throw new Error(data.error);
+                              const content = data.content || "";
+                              setWebsiteContent(content);
+                              // Append to existing knowledge
+                              const currentKnowledge = currentAgent.knowledge || "";
+                              const separator = currentKnowledge ? "\n\n--- Conteúdo extraído de " + websiteUrl + " ---\n" : "";
+                              const newKnowledge = (currentKnowledge + separator + content).substring(0, 10000);
+                              saveField("knowledge", newKnowledge);
+                              toast.success("Conteúdo extraído e adicionado à base de conhecimento!");
+                            } catch (err: any) {
+                              console.error("Scrape error:", err);
+                              toast.error(err.message || "Erro ao ler o site");
+                            } finally {
+                              setWebsiteLoading(false);
+                            }
+                          }}
+                        >
+                          {websiteLoading ? (
+                            <><span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" /> Lendo...</>
+                          ) : (
+                            <><Globe className="h-4 w-4" /> Ler site</>
+                          )}
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        O robô irá ler o conteúdo do site e usar como base de conhecimento para responder.
+                        O robô irá ler o conteúdo do site e adicionar à base de conhecimento.
                       </p>
                     </div>
-                    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                      <Globe className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                      <p>Insira uma URL acima e clique em "Ler site"</p>
-                      <p className="text-xs mt-1">O conteúdo será extraído e adicionado à base de conhecimento</p>
-                    </div>
+                    {websiteContent ? (
+                      <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                          <Check className="h-4 w-4 text-green-500" />
+                          Conteúdo extraído com sucesso
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-6">{websiteContent}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {websiteContent.length} caracteres adicionados à base de conhecimento
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                        <Globe className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p>Insira uma URL acima e clique em "Ler site"</p>
+                        <p className="text-xs mt-1">O conteúdo será extraído e adicionado à base de conhecimento</p>
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="documento" className="mt-4 space-y-4">
