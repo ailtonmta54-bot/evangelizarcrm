@@ -3,17 +3,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 import type { Node } from "@xyflow/react";
 
 interface NodeConfigPanelProps {
   node: Node;
   onUpdate: (id: string, data: Record<string, any>) => void;
   onClose: () => void;
+  onDelete: (id: string) => void;
   agents: { id: string; name: string }[];
 }
 
-export function NodeConfigPanel({ node, onUpdate, onClose, agents }: NodeConfigPanelProps) {
+export function NodeConfigPanel({ node, onUpdate, onClose, onDelete, agents }: NodeConfigPanelProps) {
   const nodeType = (node.data.nodeType as string) || "message";
   const update = (key: string, value: any) => onUpdate(node.id, { ...node.data, [key]: value });
 
@@ -147,6 +148,17 @@ export function NodeConfigPanel({ node, onUpdate, onClose, agents }: NodeConfigP
             </SelectContent>
           </Select>
         </div>
+      )}
+
+      {nodeType !== "trigger" && (
+        <Button
+          variant="destructive"
+          className="w-full gap-2 mt-4"
+          onClick={() => { onDelete(node.id); onClose(); }}
+        >
+          <Trash2 className="h-4 w-4" />
+          Excluir bloco
+        </Button>
       )}
     </div>
   );
