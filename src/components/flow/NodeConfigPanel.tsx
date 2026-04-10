@@ -3,8 +3,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Plus } from "lucide-react";
 import type { Node } from "@xyflow/react";
+
+interface Route {
+  id: string;
+  keyword: string;
+  label: string;
+}
 
 interface NodeConfigPanelProps {
   node: Node;
@@ -17,6 +23,21 @@ interface NodeConfigPanelProps {
 export function NodeConfigPanel({ node, onUpdate, onClose, onDelete, agents }: NodeConfigPanelProps) {
   const nodeType = (node.data.nodeType as string) || "message";
   const update = (key: string, value: any) => onUpdate(node.id, { ...node.data, [key]: value });
+
+  const routes: Route[] = (node.data.routes as Route[]) || [];
+
+  const addRoute = () => {
+    const newRoute: Route = { id: `route_${Date.now()}`, keyword: "", label: "" };
+    update("routes", [...routes, newRoute]);
+  };
+
+  const updateRoute = (routeId: string, field: keyof Route, value: string) => {
+    update("routes", routes.map((r) => r.id === routeId ? { ...r, [field]: value } : r));
+  };
+
+  const removeRoute = (routeId: string) => {
+    update("routes", routes.filter((r) => r.id !== routeId));
+  };
 
   return (
     <div className="w-72 border-l bg-background p-4 space-y-4 overflow-y-auto">
@@ -114,6 +135,49 @@ export function NodeConfigPanel({ node, onUpdate, onClose, onDelete, agents }: N
         </>
       )}
 
+      {nodeType === "router" && (
+        <div className="space-y-3">
+          <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800">
+            <p className="text-xs text-indigo-700 dark:text-indigo-300">
+              Direcione o lead para caminhos diferentes baseado na resposta. Cada rota verifica se a resposta contém a palavra-chave.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Rotas</Label>
+            {routes.map((route, i) => (
+              <div key={route.id} className="flex gap-1.5 items-start">
+                <div className="flex-1 space-y-1">
+                  <Input
+                    value={route.keyword}
+                    onChange={(e) => updateRoute(route.id, "keyword", e.target.value)}
+                    placeholder="Palavra-chave (ex: sim)"
+                    className="text-xs h-8"
+                  />
+                  <Input
+                    value={route.label}
+                    onChange={(e) => updateRoute(route.id, "label", e.target.value)}
+                    placeholder="Nome da rota (ex: Interessado)"
+                    className="text-xs h-8"
+                  />
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeRoute(route.id)}>
+                  <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <Button variant="outline" size="sm" className="w-full gap-1" onClick={addRoute}>
+            <Plus className="h-3 w-3" /> Adicionar rota
+          </Button>
+
+          <p className="text-xs text-muted-foreground">
+            Se nenhuma rota combinar, o lead segue pela saída padrão (inferior).
+          </p>
+        </div>
+      )}
+
       {nodeType === "assign_agent" && (
         <div className="space-y-2">
           <Label>Agente/Robô</Label>
@@ -143,8 +207,11 @@ export function NodeConfigPanel({ node, onUpdate, onClose, onDelete, agents }: N
             <SelectContent>
               <SelectItem value="novo">Novo</SelectItem>
               <SelectItem value="atendimento">Atendimento</SelectItem>
+              <SelectItem value="qualificado">Qualificado</SelectItem>
+              <SelectItem value="negociacao">Negociação</SelectItem>
               <SelectItem value="proposta">Proposta</SelectItem>
               <SelectItem value="fechado">Fechado</SelectItem>
+              <SelectItem value="perdido">Perdido</SelectItem>
             </SelectContent>
           </Select>
         </div>

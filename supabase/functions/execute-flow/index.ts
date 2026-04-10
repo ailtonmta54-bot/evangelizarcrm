@@ -192,6 +192,41 @@ Deno.serve(async (req) => {
           break;
         }
 
+        case "router": {
+          const routes = (data as any).routes || [];
+          const { data: lastMsg } = await supabase.from("messages")
+            .select("content").eq("lead_id", lead_id).eq("type", "recebida")
+            .order("created_at", { ascending: false }).limit(1).single();
+
+          const responseText = (lastMsg?.content || "").toLowerCase();
+          let matchedRouteId: string | null = null;
+
+          for (const route of routes) {
+            if (route.keyword && responseText.includes(route.keyword.toLowerCase())) {
+              matchedRouteId = route.id;
+              executionLog.push(`  → Router matched: "${route.label || route.keyword}"`);
+              break;
+            }
+          }
+
+          if (matchedRouteId) {
+            const routeEdge = edgeMap[`${currentNodeId}:${matchedRouteId}`];
+            if (routeEdge) {
+              currentNodeId = routeEdge.target_node_id;
+              continue;
+            }
+          } else {
+            // Follow default output
+            const defaultEdge = edgeMap[`${currentNodeId}:default`];
+            if (defaultEdge) {
+              currentNodeId = defaultEdge.target_node_id;
+              continue;
+            }
+          }
+          executionLog.push(`  → Router: no match, ending`);
+          break;
+        }
+
         case "assign_agent": {
           const agentId = (data as any).agentId;
           if (agentId) {
