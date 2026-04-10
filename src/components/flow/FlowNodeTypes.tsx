@@ -1,10 +1,13 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { MessageSquare, Clock, GitBranch, UserCheck, Tag, ArrowRightLeft, Zap, Route } from "lucide-react";
+import { MessageSquare, Clock, GitBranch, UserCheck, Tag, ArrowRightLeft, Zap, Route, Image, Globe, ListChecks } from "lucide-react";
 
 const nodeStyles: Record<string, { icon: typeof Zap; color: string; bg: string }> = {
   trigger: { icon: Zap, color: "text-amber-600", bg: "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" },
   message: { icon: MessageSquare, color: "text-blue-600", bg: "bg-blue-50 border-blue-300 dark:bg-blue-950 dark:border-blue-700" },
+  send_media: { icon: Image, color: "text-teal-600", bg: "bg-teal-50 border-teal-300 dark:bg-teal-950 dark:border-teal-700" },
+  buttons: { icon: ListChecks, color: "text-violet-600", bg: "bg-violet-50 border-violet-300 dark:bg-violet-950 dark:border-violet-700" },
+  webhook: { icon: Globe, color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700" },
   delay: { icon: Clock, color: "text-purple-600", bg: "bg-purple-50 border-purple-300 dark:bg-purple-950 dark:border-purple-700" },
   condition: { icon: GitBranch, color: "text-orange-600", bg: "bg-orange-50 border-orange-300 dark:bg-orange-950 dark:border-orange-700" },
   router: { icon: Route, color: "text-indigo-600", bg: "bg-indigo-50 border-indigo-300 dark:bg-indigo-950 dark:border-indigo-700" },
@@ -16,6 +19,9 @@ const nodeStyles: Record<string, { icon: typeof Zap; color: string; bg: string }
 const nodeLabels: Record<string, string> = {
   trigger: "Gatilho",
   message: "Enviar Mensagem",
+  send_media: "Enviar Mídia",
+  buttons: "Botões",
+  webhook: "Webhook",
   delay: "Aguardar",
   condition: "Condição",
   router: "Roteador",

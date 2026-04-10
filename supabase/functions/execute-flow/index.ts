@@ -85,35 +85,101 @@ Deno.serve(async (req) => {
     const nodeMap: Record<string, any> = {};
     for (const n of nodes) nodeMap[n.id] = n;
 
-    // Helper to send WhatsApp message
+    // Determine WhatsApp provider
+    const provider = agent?.whatsapp_provider || "official";
+
+    // Helper to send WhatsApp message (supports Official API and Z-API)
     async function sendWhatsApp(phone: string, message: string) {
+      if (provider === "zapi") {
+        return await sendViaZapi(phone, { type: "text", text: message });
+      }
+      return await sendViaOfficial(phone, {
+        messaging_product: "whatsapp", to: phone, type: "text", text: { body: message },
+      });
+    }
+
+    // Helper to send media via WhatsApp
+    async function sendWhatsAppMedia(phone: string, mediaType: string, mediaUrl: string, caption?: string) {
+      if (provider === "zapi") {
+        return await sendViaZapi(phone, { type: mediaType, url: mediaUrl, caption });
+      }
+      const mediaPayload: any = {
+        messaging_product: "whatsapp", to: phone, type: mediaType,
+        [mediaType]: { link: mediaUrl, ...(caption ? { caption } : {}) },
+      };
+      return await sendViaOfficial(phone, mediaPayload);
+    }
+
+    // Helper to send interactive buttons
+    async function sendWhatsAppButtons(phone: string, bodyText: string, buttons: string[]) {
+      const buttonPayload = buttons.filter(Boolean).slice(0, 3).map((text, i) => ({
+        type: "reply", reply: { id: `btn_${i}`, title: text.substring(0, 20) },
+      }));
+      if (provider === "zapi") {
+        return await sendViaZapi(phone, { type: "buttons", text: bodyText, buttons: buttonPayload });
+      }
+      return await sendViaOfficial(phone, {
+        messaging_product: "whatsapp", to: phone, type: "interactive",
+        interactive: {
+          type: "button", body: { text: bodyText },
+          action: { buttons: buttonPayload },
+        },
+      });
+    }
+
+    // Official WhatsApp API sender
+    async function sendViaOfficial(phone: string, payload: any) {
       const token = agent?.whatsapp_token;
       const phoneId = agent?.whatsapp_phone_id;
-
-      if (!token || !phoneId) {
-        console.error("No WhatsApp credentials on agent");
-        return false;
-      }
-
+      if (!token || !phoneId) { console.error("No Official WhatsApp credentials"); return false; }
       const resp = await fetch(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "text",
-          text: { body: message },
-        }),
+        body: JSON.stringify(payload),
       });
-
       if (resp.ok) {
-        // Save message to DB
         await supabase.from("messages").insert({
-          lead_id, content: message, type: "enviada", company_id,
+          lead_id, content: payload.text?.body || payload.interactive?.body?.text || "[mídia]", type: "enviada", company_id,
         });
         return true;
       }
-      console.error("WhatsApp send failed:", await resp.text());
+      console.error("Official WA send failed:", await resp.text());
+      return false;
+    }
+
+    // Z-API sender
+    async function sendViaZapi(phone: string, payload: any) {
+      const instanceId = agent?.zapi_instance_id;
+      const zapiToken = agent?.zapi_token;
+      if (!instanceId || !zapiToken) { console.error("No Z-API credentials"); return false; }
+      
+      let endpoint = "send-text";
+      let body: any = { phone, message: payload.text || "" };
+      
+      if (payload.type === "image") {
+        endpoint = "send-image"; body = { phone, image: payload.url, caption: payload.caption || "" };
+      } else if (payload.type === "video") {
+        endpoint = "send-video"; body = { phone, video: payload.url, caption: payload.caption || "" };
+      } else if (payload.type === "audio") {
+        endpoint = "send-audio"; body = { phone, audio: payload.url };
+      } else if (payload.type === "document") {
+        endpoint = "send-document"; body = { phone, document: payload.url, caption: payload.caption || "" };
+      } else if (payload.type === "buttons") {
+        endpoint = "send-button-list"; body = { phone, message: payload.text, buttons: payload.buttons };
+      }
+
+      const resp = await fetch(`https://api.z-api.io/instances/${instanceId}/token/${zapiToken}/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        await supabase.from("messages").insert({
+          lead_id, content: payload.text || payload.message || "[mídia]", type: "enviada", company_id,
+        });
+        return true;
+      }
+      console.error("Z-API send failed:", await resp.text());
       return false;
     }
 
@@ -148,6 +214,53 @@ Deno.serve(async (req) => {
           if (msg) {
             await sendWhatsApp(lead.phone, msg);
             executionLog.push(`  → Sent WhatsApp: "${msg.substring(0, 50)}..."`);
+          }
+          break;
+        }
+
+        case "send_media": {
+          const mediaType = (data as any).mediaType || "image";
+          const mediaUrl = (data as any).mediaUrl || "";
+          const caption = replacePlaceholders((data as any).mediaCaption || "");
+          if (mediaUrl) {
+            await sendWhatsAppMedia(lead.phone, mediaType, mediaUrl, caption);
+            executionLog.push(`  → Sent ${mediaType}: ${mediaUrl.substring(0, 40)}...`);
+          }
+          break;
+        }
+
+        case "buttons": {
+          const bodyText = replacePlaceholders((data as any).buttonText || "Escolha:");
+          const buttons = ((data as any).buttonOptions || []).filter(Boolean);
+          if (buttons.length > 0) {
+            await sendWhatsAppButtons(lead.phone, bodyText, buttons);
+            executionLog.push(`  → Sent buttons: ${buttons.join(", ")}`);
+          }
+          break;
+        }
+
+        case "webhook": {
+          const webhookUrl = (data as any).webhookUrl;
+          const method = (data as any).webhookMethod || "POST";
+          if (webhookUrl) {
+            let headers: Record<string, string> = { "Content-Type": "application/json" };
+            try {
+              const custom = JSON.parse((data as any).webhookHeaders || "{}");
+              headers = { ...headers, ...custom };
+            } catch {}
+            const webhookBody = JSON.stringify({
+              lead_id, lead_name: lead.name, lead_phone: lead.phone,
+              lead_status: lead.status, company_id,
+              timestamp: new Date().toISOString(),
+            });
+            try {
+              await fetch(webhookUrl, {
+                method, headers, ...(method === "POST" ? { body: webhookBody } : {}),
+              });
+              executionLog.push(`  → Webhook ${method}: ${webhookUrl.substring(0, 40)}...`);
+            } catch (err) {
+              executionLog.push(`  → Webhook failed: ${err}`);
+            }
           }
           break;
         }
