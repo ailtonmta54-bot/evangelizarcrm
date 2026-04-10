@@ -50,7 +50,26 @@ Deno.serve(async (req) => {
 
     const html = await response.text();
 
-    // Remove script, style, nav, footer, header tags and their content
+    // 1. Extract metadata (title, description, og tags) - works even for SPAs
+    const metaParts: string[] = [];
+
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    if (titleMatch?.[1]?.trim()) {
+      metaParts.push(`Título: ${titleMatch[1].trim()}`);
+    }
+
+    // Extract all meta tags content (description, og:*, twitter:*)
+    const metaRegex = /<meta[^>]+(?:name|property)\s*=\s*["']([^"']+)["'][^>]+content\s*=\s*["']([^"']+)["'][^>]*>|<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+(?:name|property)\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    let metaMatch;
+    while ((metaMatch = metaRegex.exec(html)) !== null) {
+      const name = (metaMatch[1] || metaMatch[4] || "").toLowerCase();
+      const content = (metaMatch[2] || metaMatch[3] || "").trim();
+      if (content && (name === "description" || name.startsWith("og:") || name === "keywords")) {
+        metaParts.push(`${name}: ${content}`);
+      }
+    }
+
+    // 2. Extract visible text content (standard approach)
     let text = html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
       .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -69,17 +88,54 @@ Deno.serve(async (req) => {
       .replace(/\s+/g, " ")
       .trim();
 
-    if (text.length > 5000) {
-      text = text.substring(0, 5000) + "...";
+    // 3. Extract text from JSON-LD structured data (common in modern sites)
+    const jsonLdRegex = /<script[^>]+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    let jsonLdMatch;
+    while ((jsonLdMatch = jsonLdRegex.exec(html)) !== null) {
+      try {
+        const jsonData = JSON.parse(jsonLdMatch[1]);
+        const extractText = (obj: unknown): string => {
+          if (typeof obj === "string") return obj;
+          if (Array.isArray(obj)) return obj.map(extractText).join(" ");
+          if (obj && typeof obj === "object") {
+            return Object.entries(obj as Record<string, unknown>)
+              .filter(([k]) => ["name", "description", "text", "headline", "articleBody", "about"].includes(k))
+              .map(([, v]) => extractText(v))
+              .join(" ");
+          }
+          return "";
+        };
+        const ldText = extractText(jsonData).trim();
+        if (ldText.length > 10) {
+          metaParts.push(`Dados estruturados: ${ldText}`);
+        }
+      } catch {
+        // ignore invalid JSON-LD
+      }
     }
 
-    if (!text || text.length < 20) {
-      return respond(false, { error: "Não foi possível extrair conteúdo significativo deste site. Tente outra URL." });
+    // 4. Combine metadata + body text
+    const metaContent = metaParts.join("\n");
+    let finalContent = "";
+
+    if (text.length >= 20) {
+      finalContent = metaContent ? `${metaContent}\n\n---\n\n${text}` : text;
+    } else if (metaContent.length >= 20) {
+      // SPA site - we got metadata but no body text
+      finalContent = `${metaContent}\n\n(Nota: Este site usa renderização JavaScript. O conteúdo principal pode não ter sido totalmente extraído. As informações acima foram obtidas dos metadados do site.)`;
+    } else {
+      return respond(false, {
+        error: "Não foi possível extrair conteúdo deste site. Ele pode usar renderização JavaScript (SPA). Tente colar o conteúdo manualmente na aba 'Texto'.",
+      });
     }
 
-    console.log(`Extracted ${text.length} characters from ${formattedUrl}`);
+    if (finalContent.length > 8000) {
+      finalContent = finalContent.substring(0, 8000) + "...";
+    }
 
-    return respond(true, { content: text, url: formattedUrl });
+    console.log(`Extracted ${finalContent.length} characters from ${formattedUrl}`);
+
+    return respond(true, { content: finalContent, url: formattedUrl });
   } catch (error) {
     console.error("Scrape error:", error);
     return respond(false, { error: "Erro interno ao processar o site. Tente novamente." });
