@@ -84,8 +84,12 @@ export type Database = {
           tone: string
           updated_at: string
           whatsapp_phone_id: string | null
+          whatsapp_provider: string | null
           whatsapp_token: string | null
           whatsapp_verify_token: string | null
+          zapi_enabled: boolean | null
+          zapi_instance_id: string | null
+          zapi_token: string | null
         }
         Insert: {
           active?: boolean
@@ -120,8 +124,12 @@ export type Database = {
           tone?: string
           updated_at?: string
           whatsapp_phone_id?: string | null
+          whatsapp_provider?: string | null
           whatsapp_token?: string | null
           whatsapp_verify_token?: string | null
+          zapi_enabled?: boolean | null
+          zapi_instance_id?: string | null
+          zapi_token?: string | null
         }
         Update: {
           active?: boolean
@@ -156,8 +164,12 @@ export type Database = {
           tone?: string
           updated_at?: string
           whatsapp_phone_id?: string | null
+          whatsapp_provider?: string | null
           whatsapp_token?: string | null
           whatsapp_verify_token?: string | null
+          zapi_enabled?: boolean | null
+          zapi_instance_id?: string | null
+          zapi_token?: string | null
         }
         Relationships: [
           {
