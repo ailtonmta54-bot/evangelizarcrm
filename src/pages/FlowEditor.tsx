@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save, MessageSquare, Clock, GitBranch, UserCheck, Tag, ArrowRightLeft } from "lucide-react";
+import { ArrowLeft, Save, MessageSquare, Clock, GitBranch, UserCheck, Tag, ArrowRightLeft, Route } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ const blockTypes = [
   { type: "message", label: "Mensagem", icon: MessageSquare, color: "text-blue-600" },
   { type: "delay", label: "Aguardar", icon: Clock, color: "text-purple-600" },
   { type: "condition", label: "Condição", icon: GitBranch, color: "text-orange-600" },
+  { type: "router", label: "Roteador", icon: Route, color: "text-indigo-600" },
   { type: "assign_agent", label: "Direcionar", icon: UserCheck, color: "text-green-600" },
   { type: "add_tag", label: "Tag", icon: Tag, color: "text-pink-600" },
   { type: "move_crm", label: "Mover CRM", icon: ArrowRightLeft, color: "text-cyan-600" },
