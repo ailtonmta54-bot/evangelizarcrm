@@ -134,6 +134,42 @@ export default function Robos() {
     enabled: !!companyId,
   });
 
+  const { data: agentProducts = [] } = useQuery({
+    queryKey: ["agent_products", selectedAgentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agent_products")
+        .select("product_id")
+        .eq("agent_id", selectedAgentId!);
+      if (error) throw error;
+      return data.map(ap => ap.product_id);
+    },
+    enabled: !!selectedAgentId,
+  });
+
+  const toggleProduct = useMutation({
+    mutationFn: async ({ productId, linked }: { productId: string; linked: boolean }) => {
+      if (!selectedAgentId) return;
+      if (linked) {
+        const { error } = await supabase
+          .from("agent_products")
+          .delete()
+          .eq("agent_id", selectedAgentId)
+          .eq("product_id", productId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("agent_products")
+          .insert({ agent_id: selectedAgentId, product_id: productId });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agent_products", selectedAgentId] });
+    },
+    onError: () => toast.error("Erro ao atualizar produto"),
+  });
+
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
 
   const currentAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
@@ -601,7 +637,6 @@ export default function Robos() {
             </Card>
           </TabsContent>
 
-          {/* === PRODUTOS === */}
           <TabsContent value="produtos" className="space-y-6 mt-4">
             <Card>
               <CardHeader className="pb-3">
@@ -617,31 +652,40 @@ export default function Robos() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {products.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                      >
-                        <Checkbox
-                          checked={true}
-                          disabled
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{product.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{product.description || "Sem descrição"}</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs text-muted-foreground">
+                        {agentProducts.length} de {products.length} produtos selecionados
+                      </p>
+                    </div>
+                    {products.map((product) => {
+                      const isLinked = agentProducts.includes(product.id);
+                      return (
+                        <div
+                          key={product.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            isLinked ? "bg-primary/5 border-primary/30" : "hover:bg-muted/50"
+                          }`}
+                          onClick={() => toggleProduct.mutate({ productId: product.id, linked: isLinked })}
+                        >
+                          <Checkbox checked={isLinked} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{product.description || "Sem descrição"}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold">R$ {Number(product.price).toFixed(2)}</p>
+                            {product.external_link && (
+                              <a href={product.external_link} target="_blank" rel="noopener" className="text-xs text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}>
+                                Ver link
+                              </a>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-semibold">R$ {Number(product.price).toFixed(2)}</p>
-                          {product.external_link && (
-                            <a href={product.external_link} target="_blank" rel="noopener" className="text-xs text-primary hover:underline">
-                              Ver link
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <p className="text-xs text-muted-foreground pt-2">
-                      Todos os produtos da empresa são automaticamente acessíveis pelo robô. Para adicionar ou editar produtos, vá em <strong>Produtos</strong> no menu lateral.
+                      Clique para vincular ou desvincular produtos deste robô. Apenas os produtos selecionados serão oferecidos.
                     </p>
                   </div>
                 )}

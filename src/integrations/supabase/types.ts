@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_products: {
+        Row: {
+          agent_id: string
+          created_at: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_products_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           active: boolean
@@ -646,7 +682,14 @@ export type Database = {
         | "agendamento"
         | "custom"
       app_role: "admin" | "user"
-      lead_status: "novo" | "atendimento" | "proposta" | "fechado"
+      lead_status:
+        | "novo"
+        | "atendimento"
+        | "proposta"
+        | "fechado"
+        | "qualificado"
+        | "negociacao"
+        | "perdido"
       message_type: "enviada" | "recebida"
     }
     CompositeTypes: {
@@ -784,7 +827,15 @@ export const Constants = {
         "custom",
       ],
       app_role: ["admin", "user"],
-      lead_status: ["novo", "atendimento", "proposta", "fechado"],
+      lead_status: [
+        "novo",
+        "atendimento",
+        "proposta",
+        "fechado",
+        "qualificado",
+        "negociacao",
+        "perdido",
+      ],
       message_type: ["enviada", "recebida"],
     },
   },
