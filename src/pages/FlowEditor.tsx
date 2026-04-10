@@ -139,6 +139,11 @@ export default function FlowEditor() {
   const onNodeClick = (_: React.MouseEvent, node: Node) => setSelectedNode(node);
   const onPaneClick = () => setSelectedNode(null);
 
+  const deleteNode = (id: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== id));
+    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+  };
+
   // Save flow
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -279,6 +284,7 @@ export default function FlowEditor() {
           node={selectedNode}
           onUpdate={updateNodeData}
           onClose={() => setSelectedNode(null)}
+          onDelete={deleteNode}
           agents={agents}
         />
       )}
