@@ -225,6 +225,7 @@ Deno.serve(async (req) => {
           }
           executionLog.push(`  → Router: no match, ending`);
           break;
+        }
 
         case "assign_agent": {
           const agentId = (data as any).agentId;
