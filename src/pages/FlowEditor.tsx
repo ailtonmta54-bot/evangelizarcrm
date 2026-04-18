@@ -197,17 +197,21 @@ export default function FlowEditor() {
           nodeIdMap[node.id] = inserted.id;
         }
 
-        // Insert edges with mapped IDs
+        // Insert edges with mapped IDs (filter out edges with missing nodes)
         if (edges.length > 0) {
-          const edgeInserts = edges.map((e) => ({
-            flow_id: fId!,
-            source_node_id: nodeIdMap[e.source],
-            target_node_id: nodeIdMap[e.target],
-            source_handle: e.sourceHandle || "",
-            label: (e.label as string) || "",
-          }));
-          const { error } = await supabase.from("flow_edges").insert(edgeInserts);
-          if (error) throw error;
+          const edgeInserts = edges
+            .filter((e) => nodeIdMap[e.source] && nodeIdMap[e.target])
+            .map((e) => ({
+              flow_id: fId!,
+              source_node_id: nodeIdMap[e.source],
+              target_node_id: nodeIdMap[e.target],
+              source_handle: e.sourceHandle || "",
+              label: (e.label as string) || "",
+            }));
+          if (edgeInserts.length > 0) {
+            const { error } = await supabase.from("flow_edges").insert(edgeInserts);
+            if (error) throw error;
+          }
         }
       }
 
@@ -218,7 +222,10 @@ export default function FlowEditor() {
       toast.success("Fluxo salvo!");
       if (flowId === "new") navigate(`/automacoes/flow/${fId}`, { replace: true });
     },
-    onError: () => toast.error("Erro ao salvar fluxo"),
+    onError: (err: any) => {
+      console.error("Save flow error:", err);
+      toast.error(`Erro ao salvar fluxo: ${err?.message || "verifique os blocos"}`);
+    },
   });
 
   return (
