@@ -1,0 +1,1 @@
+ALTER TABLE public.automations ADD COLUMN IF NOT EXISTS scheduled_time time without time zone;

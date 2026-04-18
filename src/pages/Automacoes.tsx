@@ -43,6 +43,7 @@ export default function Automacoes() {
   const [newTrigger, setNewTrigger] = useState("novo_lead");
   const [newMessage, setNewMessage] = useState("");
   const [newDelayHours, setNewDelayHours] = useState("24");
+  const [newScheduledTime, setNewScheduledTime] = useState("");
 
   const { data: automations = [] } = useQuery({
     queryKey: ["automations", companyId],
@@ -69,16 +70,17 @@ export default function Automacoes() {
       const { error } = await supabase.from("automations").insert({
         name: newName, trigger_type: newTrigger, message: newMessage,
         delay_hours: newTrigger === "sem_resposta" ? parseInt(newDelayHours) || 24 : 0,
+        scheduled_time: newScheduledTime || null,
         company_id: companyId!,
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["automations"] });
-      setNewName(""); setNewMessage(""); setNewDelayHours("24"); setOpen(false);
+      setNewName(""); setNewMessage(""); setNewDelayHours("24"); setNewScheduledTime(""); setOpen(false);
       toast.success("Automação criada!");
     },
-    onError: () => toast.error("Erro ao criar automação"),
+    onError: (err: any) => toast.error(`Erro ao criar automação: ${err?.message || ""}`),
   });
 
   const toggleMutation = useMutation({
@@ -213,6 +215,11 @@ export default function Automacoes() {
                       <Input type="number" min="1" value={newDelayHours} onChange={(e) => setNewDelayHours(e.target.value)} placeholder="24" />
                     </div>
                   )}
+                  <div className="space-y-2">
+                    <Label>Horário de envio (opcional)</Label>
+                    <Input type="time" value={newScheduledTime} onChange={(e) => setNewScheduledTime(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Defina a hora exata em que a mensagem deve ser enviada. Deixe em branco para enviar imediatamente após o gatilho.</p>
+                  </div>
                   <div className="space-y-2">
                     <Label>Mensagem</Label>
                     <Textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Olá {nome}, tudo bem? ..." rows={3} />
