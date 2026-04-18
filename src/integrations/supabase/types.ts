@@ -232,6 +232,7 @@ export type Database = {
           id: string
           message: string
           name: string
+          scheduled_time: string | null
           trigger_type: string
           updated_at: string
         }
@@ -243,6 +244,7 @@ export type Database = {
           id?: string
           message?: string
           name: string
+          scheduled_time?: string | null
           trigger_type?: string
           updated_at?: string
         }
@@ -254,6 +256,7 @@ export type Database = {
           id?: string
           message?: string
           name?: string
+          scheduled_time?: string | null
           trigger_type?: string
           updated_at?: string
         }
