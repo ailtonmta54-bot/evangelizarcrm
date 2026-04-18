@@ -90,6 +90,17 @@ export function NodeConfigPanel({ node, onUpdate, onClose, onDelete, agents }: N
             />
             <p className="text-xs text-muted-foreground">Use {"{nome}"} para o nome do lead</p>
           </div>
+          <div className="space-y-2">
+            <Label>Horário de envio (opcional)</Label>
+            <Input
+              type="time"
+              value={(node.data.scheduledTime as string) || ""}
+              onChange={(e) => update("scheduledTime", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Hora exata em que esta mensagem deve ser enviada. Deixe em branco para enviar imediatamente.
+            </p>
+          </div>
         </div>
       )}
 
