@@ -281,8 +281,12 @@ export type Database = {
           instagram_app_id: string | null
           instagram_app_secret: string | null
           instagram_business_id: string | null
+          instagram_connected_at: string | null
           instagram_enabled: boolean
           instagram_page_id: string | null
+          instagram_profile_pic_url: string | null
+          instagram_token_expires_at: string | null
+          instagram_username: string | null
           instagram_verify_token: string | null
           name: string
           openai_api_key: string | null
@@ -298,8 +302,12 @@ export type Database = {
           instagram_app_id?: string | null
           instagram_app_secret?: string | null
           instagram_business_id?: string | null
+          instagram_connected_at?: string | null
           instagram_enabled?: boolean
           instagram_page_id?: string | null
+          instagram_profile_pic_url?: string | null
+          instagram_token_expires_at?: string | null
+          instagram_username?: string | null
           instagram_verify_token?: string | null
           name?: string
           openai_api_key?: string | null
@@ -315,8 +323,12 @@ export type Database = {
           instagram_app_id?: string | null
           instagram_app_secret?: string | null
           instagram_business_id?: string | null
+          instagram_connected_at?: string | null
           instagram_enabled?: boolean
           instagram_page_id?: string | null
+          instagram_profile_pic_url?: string | null
+          instagram_token_expires_at?: string | null
+          instagram_username?: string | null
           instagram_verify_token?: string | null
           name?: string
           openai_api_key?: string | null
@@ -586,6 +598,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      oauth_states: {
+        Row: {
+          company_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          provider: string
+          state: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          provider?: string
+          state: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          provider?: string
+          state?: string
+        }
+        Relationships: []
       }
       products: {
         Row: {
