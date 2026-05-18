@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Search, MessageSquare } from "lucide-react";
+import { Send, Search, MessageSquare, Instagram } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,19 +56,21 @@ export default function Inbox() {
     mutationFn: async () => {
       if (!newMessage.trim() || !selectedLead || !companyId) return;
 
-      if (whatsappConfigured && selectedLead.phone) {
-        // Send via WhatsApp
+      const isInstagram = (selectedLead as any).source === "instagram";
+
+      if (isInstagram) {
+        const { data, error } = await supabase.functions.invoke("instagram-send", {
+          body: { lead_id: selectedLead.id, message: newMessage },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      } else if (whatsappConfigured && selectedLead.phone) {
         const { data, error } = await supabase.functions.invoke("whatsapp-send", {
-          body: {
-            to: selectedLead.phone,
-            message: newMessage,
-            lead_id: selectedLead.id,
-          },
+          body: { to: selectedLead.phone, message: newMessage, lead_id: selectedLead.id },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
       } else {
-        // Save locally only (no WhatsApp)
         const { error } = await supabase.from("messages").insert({
           lead_id: selectedLead.id,
           content: newMessage,
@@ -102,24 +104,41 @@ export default function Inbox() {
           {filtered.length === 0 && (
             <p className="text-center text-muted-foreground text-sm py-8">Nenhum lead encontrado.</p>
           )}
-          {filtered.map((lead) => (
-            <button
-              key={lead.id}
-              onClick={() => setSelectedLeadId(lead.id)}
-              className={cn(
-                "w-full flex items-start gap-3 p-3 text-left hover:bg-accent transition-colors",
-                selectedLead?.id === lead.id && "bg-accent"
-              )}
-            >
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-semibold text-primary">
-                {lead.name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="font-medium text-sm truncate block">{lead.name}</span>
-                <p className="text-xs text-muted-foreground truncate">{lead.phone}</p>
-              </div>
-            </button>
-          ))}
+          {filtered.map((lead) => {
+            const isIg = (lead as any).source === "instagram";
+            const subtitle = isIg ? ((lead as any).instagram_username ? `@${(lead as any).instagram_username}` : "Instagram") : lead.phone;
+            const picUrl = (lead as any).profile_pic_url;
+            return (
+              <button
+                key={lead.id}
+                onClick={() => setSelectedLeadId(lead.id)}
+                className={cn(
+                  "w-full flex items-start gap-3 p-3 text-left hover:bg-accent transition-colors",
+                  selectedLead?.id === lead.id && "bg-accent"
+                )}
+              >
+                <div className="relative shrink-0">
+                  {picUrl ? (
+                    <img src={picUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                      {lead.name.charAt(0)}
+                    </div>
+                  )}
+                  <div className={cn(
+                    "absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center border-2 border-card",
+                    isIg ? "bg-pink-500" : "bg-emerald-500"
+                  )}>
+                    {isIg ? <Instagram className="h-2.5 w-2.5 text-white" /> : <MessageSquare className="h-2.5 w-2.5 text-white" />}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-sm truncate block">{lead.name}</span>
+                  <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -128,15 +147,28 @@ export default function Inbox() {
           <>
             <div className="h-14 border-b flex items-center justify-between px-4 bg-card shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                  {selectedLead.name.charAt(0)}
-                </div>
+                {(selectedLead as any).profile_pic_url ? (
+                  <img src={(selectedLead as any).profile_pic_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                    {selectedLead.name.charAt(0)}
+                  </div>
+                )}
                 <div>
                   <span className="font-medium">{selectedLead.name}</span>
-                  <p className="text-xs text-muted-foreground">{selectedLead.phone}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(selectedLead as any).source === "instagram"
+                      ? ((selectedLead as any).instagram_username ? `@${(selectedLead as any).instagram_username}` : "Instagram Direct")
+                      : selectedLead.phone}
+                  </p>
                 </div>
               </div>
-              {whatsappConfigured && (
+              {(selectedLead as any).source === "instagram" ? (
+                <div className="flex items-center gap-1 text-xs text-pink-600">
+                  <Instagram className="h-3 w-3" />
+                  <span>Instagram</span>
+                </div>
+              ) : whatsappConfigured && (
                 <div className="flex items-center gap-1 text-xs text-primary">
                   <MessageSquare className="h-3 w-3" />
                   <span>WhatsApp ativo</span>
@@ -169,7 +201,11 @@ export default function Inbox() {
 
             <div className="p-3 border-t bg-card flex gap-2">
               <Input
-                placeholder={whatsappConfigured ? "Enviar via WhatsApp..." : "Digite uma mensagem..."}
+                placeholder={
+                  (selectedLead as any).source === "instagram"
+                    ? "Responder no Instagram Direct..."
+                    : whatsappConfigured ? "Enviar via WhatsApp..." : "Digite uma mensagem..."
+                }
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMutation.mutate()}
