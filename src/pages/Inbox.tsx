@@ -147,15 +147,28 @@ export default function Inbox() {
           <>
             <div className="h-14 border-b flex items-center justify-between px-4 bg-card shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                  {selectedLead.name.charAt(0)}
-                </div>
+                {(selectedLead as any).profile_pic_url ? (
+                  <img src={(selectedLead as any).profile_pic_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                    {selectedLead.name.charAt(0)}
+                  </div>
+                )}
                 <div>
                   <span className="font-medium">{selectedLead.name}</span>
-                  <p className="text-xs text-muted-foreground">{selectedLead.phone}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(selectedLead as any).source === "instagram"
+                      ? ((selectedLead as any).instagram_username ? `@${(selectedLead as any).instagram_username}` : "Instagram Direct")
+                      : selectedLead.phone}
+                  </p>
                 </div>
               </div>
-              {whatsappConfigured && (
+              {(selectedLead as any).source === "instagram" ? (
+                <div className="flex items-center gap-1 text-xs text-pink-600">
+                  <Instagram className="h-3 w-3" />
+                  <span>Instagram</span>
+                </div>
+              ) : whatsappConfigured && (
                 <div className="flex items-center gap-1 text-xs text-primary">
                   <MessageSquare className="h-3 w-3" />
                   <span>WhatsApp ativo</span>
