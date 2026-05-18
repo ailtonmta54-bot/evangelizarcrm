@@ -201,7 +201,11 @@ export default function Inbox() {
 
             <div className="p-3 border-t bg-card flex gap-2">
               <Input
-                placeholder={whatsappConfigured ? "Enviar via WhatsApp..." : "Digite uma mensagem..."}
+                placeholder={
+                  (selectedLead as any).source === "instagram"
+                    ? "Responder no Instagram Direct..."
+                    : whatsappConfigured ? "Enviar via WhatsApp..." : "Digite uma mensagem..."
+                }
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMutation.mutate()}
