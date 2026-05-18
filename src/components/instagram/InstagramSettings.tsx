@@ -1,39 +1,33 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Instagram, Copy, Check, Save } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Instagram, CheckCircle2, AlertTriangle, Loader2, LogIn, LogOut, HandMetal } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
 
-const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID as string;
-const WEBHOOK_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/instagram-webhook`;
+type Status = "disconnected" | "connected" | "expired" | "expiring";
 
 export function InstagramSettings() {
   const companyId = useCompanyId();
   const queryClient = useQueryClient();
-  const [copied, setCopied] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [form, setForm] = useState({
-    instagram_app_id: "",
-    instagram_app_secret: "",
-    instagram_access_token: "",
-    instagram_business_id: "",
-    instagram_page_id: "",
-    instagram_verify_token: "",
-    instagram_enabled: false,
-  });
-
-  const { data: company } = useQuery({
-    queryKey: ["instagram-settings", companyId],
+  const { data: company, isLoading } = useQuery({
+    queryKey: ["instagram-status", companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("companies")
-        .select("instagram_app_id, instagram_app_secret, instagram_access_token, instagram_business_id, instagram_page_id, instagram_verify_token, instagram_enabled")
+        .select(
+          "instagram_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at"
+        )
         .eq("id", companyId!)
         .single();
       if (error) throw error;
@@ -42,118 +36,214 @@ export function InstagramSettings() {
     enabled: !!companyId,
   });
 
+  // Handle OAuth return params
   useEffect(() => {
-    if (company) {
-      setForm({
-        instagram_app_id: company.instagram_app_id || "",
-        instagram_app_secret: company.instagram_app_secret || "",
-        instagram_access_token: company.instagram_access_token || "",
-        instagram_business_id: company.instagram_business_id || "",
-        instagram_page_id: company.instagram_page_id || "",
-        instagram_verify_token: company.instagram_verify_token || "",
-        instagram_enabled: company.instagram_enabled || false,
-      });
+    const ig = searchParams.get("instagram");
+    if (!ig) return;
+    if (ig === "connected") {
+      toast.success("Instagram conectado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["instagram-status"] });
+    } else if (ig === "error") {
+      const reason = searchParams.get("reason") || "desconhecido";
+      toast.error(`Falha ao conectar Instagram (${reason})`);
     }
-  }, [company]);
+    searchParams.delete("instagram");
+    searchParams.delete("reason");
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, queryClient]);
 
-  const saveMutation = useMutation({
+  const status: Status = (() => {
+    if (!company?.instagram_enabled || !company?.instagram_username) return "disconnected";
+    const exp = company.instagram_token_expires_at ? new Date(company.instagram_token_expires_at).getTime() : 0;
+    const now = Date.now();
+    if (exp && exp < now) return "expired";
+    if (exp && exp - now < 7 * 24 * 3600 * 1000) return "expiring";
+    return "connected";
+  })();
+
+  const connectMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("companies").update(form).eq("id", companyId!);
+      const { data, error } = await supabase.functions.invoke("instagram-oauth-start", {
+        body: { return_to: window.location.origin + "/settings" },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error("URL de autorização não recebida");
+      window.location.href = data.url;
+    },
+    onError: (err: Error) => toast.error(err.message || "Erro ao iniciar conexão"),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("instagram-disconnect", { body: {} });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["instagram-settings"] });
-      toast.success("Configurações do Instagram salvas!");
+      toast.success("Instagram desconectado");
+      queryClient.invalidateQueries({ queryKey: ["instagram-status"] });
     },
-    onError: (err: Error) => toast.error(err.message || "Erro ao salvar"),
+    onError: (err: Error) => toast.error(err.message || "Erro ao desconectar"),
   });
 
-  const copyWebhook = () => {
-    navigator.clipboard.writeText(WEBHOOK_URL);
-    setCopied(true);
-    toast.success("URL copiada!");
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const toggleEnabledMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase.from("companies").update({ instagram_enabled: enabled }).eq("id", companyId!);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["instagram-status"] }),
+    onError: (err: Error) => toast.error(err.message || "Erro"),
+  });
+
+  // Human takeover: disable AI on all IG leads of this company
+  const humanTakeoverMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ ai_enabled: false })
+        .eq("company_id", companyId!)
+        .eq("source", "instagram");
+      if (error) throw error;
+    },
+    onSuccess: () => toast.success("Bot pausado em todas as conversas do Instagram"),
+    onError: (err: Error) => toast.error(err.message || "Erro"),
+  });
+
+  const isConnecting = connectMutation.isPending;
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Instagram className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle>Integração Instagram Direct</CardTitle>
-              <CardDescription>Conecte sua conta Business para receber e responder DMs</CardDescription>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-pink-500 via-purple-500 to-orange-400 flex items-center justify-center">
+            <Instagram className="h-5 w-5 text-white" />
           </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="ig-enabled" className="text-sm">Ativo</Label>
-            <Switch
-              id="ig-enabled"
-              checked={form.instagram_enabled}
-              onCheckedChange={(v) => setForm({ ...form, instagram_enabled: v })}
-            />
+          <div className="flex-1">
+            <CardTitle>Instagram Direct</CardTitle>
+            <CardDescription>Conecte sua conta Business para receber e responder DMs no CRM</CardDescription>
           </div>
+          {status === "connected" && (
+            <Badge className="gap-1 bg-emerald-500 hover:bg-emerald-500">
+              <CheckCircle2 className="h-3 w-3" /> Conectado
+            </Badge>
+          )}
+          {status === "expiring" && (
+            <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-700">
+              Expira em breve
+            </Badge>
+          )}
+          {status === "expired" && (
+            <Badge variant="destructive" className="gap-1">
+              Expirado
+            </Badge>
+          )}
+          {status === "disconnected" && (
+            <Badge variant="secondary">Não conectado</Badge>
+          )}
         </div>
       </CardHeader>
+
       <CardContent className="space-y-4">
-        <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-          <Label className="text-xs text-muted-foreground">Webhook URL (cole no painel Meta → Webhooks → Instagram)</Label>
-          <div className="flex gap-2">
-            <Input value={WEBHOOK_URL} readOnly className="font-mono text-xs" />
-            <Button type="button" variant="outline" size="icon" onClick={copyWebhook}>
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
+          </div>
+        ) : status === "disconnected" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Faça login com sua conta Meta/Facebook e autorize o acesso. Sua senha nunca é compartilhada com o CRM —
+              utilizamos o login oficial da Meta.
+            </p>
+            <Button
+              size="lg"
+              className="w-full sm:w-auto gap-2 bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 hover:opacity-90 text-white"
+              onClick={() => connectMutation.mutate()}
+              disabled={isConnecting}
+            >
+              {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+              {isConnecting ? "Abrindo login Meta..." : "Entrar com Instagram"}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Use o mesmo <strong>Verify Token</strong> abaixo na configuração do webhook.
-          </p>
-        </div>
+        ) : (
+          <>
+            {(status === "expired" || status === "expiring") && (
+              <Alert variant={status === "expired" ? "destructive" : "default"}>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>
+                  {status === "expired" ? "Conexão expirada" : "Conexão expira em breve"}
+                </AlertTitle>
+                <AlertDescription>
+                  Reconecte sua conta Instagram para continuar recebendo mensagens.
+                </AlertDescription>
+              </Alert>
+            )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Meta App ID</Label>
-            <Input value={form.instagram_app_id} onChange={(e) => setForm({ ...form, instagram_app_id: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Meta App Secret</Label>
-            <Input type="password" value={form.instagram_app_secret} onChange={(e) => setForm({ ...form, instagram_app_secret: e.target.value })} />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>Access Token (Long-Lived)</Label>
-            <Input type="password" value={form.instagram_access_token} onChange={(e) => setForm({ ...form, instagram_access_token: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Instagram Business Account ID</Label>
-            <Input value={form.instagram_business_id} onChange={(e) => setForm({ ...form, instagram_business_id: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Facebook Page ID</Label>
-            <Input value={form.instagram_page_id} onChange={(e) => setForm({ ...form, instagram_page_id: e.target.value })} />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>Webhook Verify Token</Label>
-            <Input
-              value={form.instagram_verify_token}
-              onChange={(e) => setForm({ ...form, instagram_verify_token: e.target.value })}
-              placeholder="ex: meu-token-secreto-123"
-            />
-          </div>
-        </div>
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={company?.instagram_profile_pic_url || undefined} />
+                  <AvatarFallback>
+                    <Instagram className="h-5 w-5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">@{company?.instagram_username}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Conectado em{" "}
+                    {company?.instagram_connected_at
+                      ? new Date(company.instagram_connected_at).toLocaleDateString("pt-BR")
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {(status === "expired" || status === "expiring") && (
+                  <Button variant="outline" size="sm" onClick={() => connectMutation.mutate()} disabled={isConnecting}>
+                    {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                    Reconectar
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => disconnectMutation.mutate()}
+                  disabled={disconnectMutation.isPending}
+                  className="gap-1"
+                >
+                  <LogOut className="h-4 w-4" /> Desconectar
+                </Button>
+              </div>
+            </div>
 
-        <div className="rounded-md border bg-primary/5 p-3 text-xs space-y-1">
-          <p className="font-medium">Pré-requisitos:</p>
-          <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-            <li>Conta Instagram <strong>Business ou Creator</strong> conectada a uma Página do Facebook</li>
-            <li>App Meta com produtos <strong>Instagram Graph API</strong> + <strong>Webhooks</strong></li>
-            <li>Permissões: <code>instagram_basic</code>, <code>instagram_manage_messages</code>, <code>pages_messaging</code></li>
-            <li>Inscrever o webhook no campo <code>messages</code></li>
-          </ul>
-        </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div>
+                <Label className="text-sm font-medium">Bot de IA no Instagram Direct</Label>
+                <p className="text-xs text-muted-foreground">Responder mensagens automaticamente com IA</p>
+              </div>
+              <Switch
+                checked={!!company?.instagram_enabled}
+                onCheckedChange={(v) => toggleEnabledMutation.mutate(v)}
+              />
+            </div>
 
-        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
-          <Save className="h-4 w-4" /> {saveMutation.isPending ? "Salvando..." : "Salvar Instagram"}
-        </Button>
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div>
+                <Label className="text-sm font-medium">Atendimento humano</Label>
+                <p className="text-xs text-muted-foreground">
+                  Pausar o bot em todas as conversas atuais do Instagram
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => humanTakeoverMutation.mutate()}
+                disabled={humanTakeoverMutation.isPending}
+                className="gap-2"
+              >
+                <HandMetal className="h-4 w-4" /> Assumir conversas
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

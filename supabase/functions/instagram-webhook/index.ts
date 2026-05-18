@@ -56,25 +56,16 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // GET: Meta webhook handshake
+  // GET: Meta webhook handshake (uses platform-wide verify token)
   if (req.method === "GET") {
     const mode = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
+    const expected = Deno.env.get("META_WEBHOOK_VERIFY_TOKEN");
 
-    if (mode === "subscribe" && token && challenge) {
-      const { data: company } = await supabase
-        .from("companies")
-        .select("id")
-        .eq("instagram_verify_token", token)
-        .eq("instagram_enabled", true)
-        .limit(1)
-        .maybeSingle();
-
-      if (company) {
-        console.log("IG webhook verified for company:", company.id);
-        return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
-      }
+    if (mode === "subscribe" && token && challenge && expected && token === expected) {
+      console.log("IG webhook handshake ok");
+      return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
     }
     return new Response("Forbidden", { status: 403 });
   }
