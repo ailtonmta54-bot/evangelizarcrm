@@ -56,6 +56,7 @@ export type Database = {
           agent_type: Database["public"]["Enums"]["agent_type"]
           avatar_url: string | null
           away_message: string | null
+          channel: string
           company_id: string
           created_at: string
           description: string
@@ -96,6 +97,7 @@ export type Database = {
           agent_type?: Database["public"]["Enums"]["agent_type"]
           avatar_url?: string | null
           away_message?: string | null
+          channel?: string
           company_id: string
           created_at?: string
           description?: string
@@ -136,6 +138,7 @@ export type Database = {
           agent_type?: Database["public"]["Enums"]["agent_type"]
           avatar_url?: string | null
           away_message?: string | null
+          channel?: string
           company_id?: string
           created_at?: string
           description?: string
@@ -274,6 +277,13 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          instagram_access_token: string | null
+          instagram_app_id: string | null
+          instagram_app_secret: string | null
+          instagram_business_id: string | null
+          instagram_enabled: boolean
+          instagram_page_id: string | null
+          instagram_verify_token: string | null
           name: string
           openai_api_key: string | null
           updated_at: string
@@ -284,6 +294,13 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          instagram_access_token?: string | null
+          instagram_app_id?: string | null
+          instagram_app_secret?: string | null
+          instagram_business_id?: string | null
+          instagram_enabled?: boolean
+          instagram_page_id?: string | null
+          instagram_verify_token?: string | null
           name?: string
           openai_api_key?: string | null
           updated_at?: string
@@ -294,6 +311,13 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          instagram_access_token?: string | null
+          instagram_app_id?: string | null
+          instagram_app_secret?: string | null
+          instagram_business_id?: string | null
+          instagram_enabled?: boolean
+          instagram_page_id?: string | null
+          instagram_verify_token?: string | null
           name?: string
           openai_api_key?: string | null
           updated_at?: string
@@ -444,34 +468,64 @@ export type Database = {
         Row: {
           agent_id: string | null
           ai_enabled: boolean
+          assigned_to: string | null
           company_id: string
           created_at: string
+          email: string | null
+          follow_up_date: string | null
           id: string
+          instagram_user_id: string | null
+          instagram_username: string | null
+          interest: string | null
           name: string
+          notes: string | null
           phone: string
+          profile_pic_url: string | null
+          source: string
           status: Database["public"]["Enums"]["lead_status"]
+          tags: string[]
           updated_at: string
         }
         Insert: {
           agent_id?: string | null
           ai_enabled?: boolean
+          assigned_to?: string | null
           company_id: string
           created_at?: string
+          email?: string | null
+          follow_up_date?: string | null
           id?: string
+          instagram_user_id?: string | null
+          instagram_username?: string | null
+          interest?: string | null
           name: string
+          notes?: string | null
           phone?: string
+          profile_pic_url?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["lead_status"]
+          tags?: string[]
           updated_at?: string
         }
         Update: {
           agent_id?: string | null
           ai_enabled?: boolean
+          assigned_to?: string | null
           company_id?: string
           created_at?: string
+          email?: string | null
+          follow_up_date?: string | null
           id?: string
+          instagram_user_id?: string | null
+          instagram_username?: string | null
+          interest?: string | null
           name?: string
+          notes?: string | null
           phone?: string
+          profile_pic_url?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["lead_status"]
+          tags?: string[]
           updated_at?: string
         }
         Relationships: [
