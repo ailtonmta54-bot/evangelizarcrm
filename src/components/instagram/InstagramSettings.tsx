@@ -66,11 +66,13 @@ export function InstagramSettings() {
       const { data, error } = await supabase.functions.invoke("instagram-oauth-start", {
         body: { return_to: window.location.origin + "/settings" },
       });
-      if (error) throw error;
-      if (!data?.url) throw new Error("URL de autorização não recebida");
+      if (error || data?.error || !data?.url) {
+        console.error("instagram-oauth-start error:", error || data?.error);
+        throw new Error("Instagram connection could not start. Please check platform configuration.");
+      }
       window.location.href = data.url;
     },
-    onError: (err: Error) => toast.error(err.message || "Erro ao iniciar conexão"),
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const disconnectMutation = useMutation({
