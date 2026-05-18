@@ -56,19 +56,21 @@ export default function Inbox() {
     mutationFn: async () => {
       if (!newMessage.trim() || !selectedLead || !companyId) return;
 
-      if (whatsappConfigured && selectedLead.phone) {
-        // Send via WhatsApp
+      const isInstagram = (selectedLead as any).source === "instagram";
+
+      if (isInstagram) {
+        const { data, error } = await supabase.functions.invoke("instagram-send", {
+          body: { lead_id: selectedLead.id, message: newMessage },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      } else if (whatsappConfigured && selectedLead.phone) {
         const { data, error } = await supabase.functions.invoke("whatsapp-send", {
-          body: {
-            to: selectedLead.phone,
-            message: newMessage,
-            lead_id: selectedLead.id,
-          },
+          body: { to: selectedLead.phone, message: newMessage, lead_id: selectedLead.id },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
       } else {
-        // Save locally only (no WhatsApp)
         const { error } = await supabase.from("messages").insert({
           lead_id: selectedLead.id,
           content: newMessage,
