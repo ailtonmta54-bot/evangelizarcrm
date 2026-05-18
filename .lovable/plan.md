@@ -1,80 +1,113 @@
-# Integração Instagram Direct no Evangelizar CRM
+# Instagram OAuth — Conexão Simples para Clientes Revenda
 
-Adicionar o Instagram como **novo canal de mensagens** ao lado do WhatsApp já existente, reutilizando Inbox, CRM Kanban, Robôs IA, Automações e Dashboard. Sem reescrever o que já funciona.
+## Objetivo
+O cliente final do CRM conecta o Instagram dele em **1 clique** ("Conectar Instagram" → login Meta → autorizar → pronto). Nenhuma chave técnica é exposta. Credenciais do App Meta ficam apenas no backend da plataforma (você, o revendedor).
 
-## Entrega em 3 fases
+## Mudança de arquitetura
 
-### Fase 1 — Conexão + Inbox Instagram (esta entrega)
-- Página **Configurações → Instagram**: campos Meta App ID, App Secret, Access Token (long-lived), Instagram Business Account ID, Page ID, Webhook Verify Token. Botão "Testar conexão" e exibição da Webhook URL pronta para colar no painel Meta.
-- **Webhook público** (`instagram-webhook`) recebendo mensagens em tempo real, criando/atualizando lead com `source = 'instagram'` e gravando mensagem.
-- **Envio** (`instagram-send`) via Graph API `/me/messages` usando o token da empresa.
-- **Inbox**: identificador visual do canal (ícone Instagram vs WhatsApp), foto e @username quando disponíveis, envio responde pelo canal de origem do lead.
-- Campos novos no lead: `instagram_username`, `instagram_user_id`, `profile_pic_url`, `email`, `interest`, `source`, `assigned_to`, `follow_up_date`, `notes`.
-
-### Fase 2 — IA Instagram + Tags automáticas + Takeover humano
-- Reaproveita Robôs IA (já existem com base de conhecimento, tom, temperatura). Adiciona seletor de canal no robô: WhatsApp / Instagram / Ambos.
-- Toggle **IA ligada/desligada por conversa** no header do chat (campo `ai_enabled` já existe na tabela `leads`).
-- Tags automáticas por palavra-chave (price, comprar, agendar, proposta) usando o motor de automações existente.
-- Notificação interna quando o lead pede humano ou dispara palavra quente.
-
-### Fase 3 — Dashboard Instagram + RBAC refinado
-- Cards no Dashboard: leads IG, mensagens IG novas, conversas IA vs humano, conversão por etapa.
-- Manter Admin (configura integração) e Atendente (responde + leads atribuídos). Admin/Manager unificados por enquanto.
-
-## Mudanças no banco (Fase 1)
+**Antes (atual):** cada empresa preenchia App ID, Secret, Token, Verify Token na tela de Configurações.
+**Agora:** existe **um único App Meta da plataforma** (suas credenciais como dono do CRM white-label). Cada cliente apenas autoriza esse App a acessar a conta Instagram dele via OAuth.
 
 ```text
-companies
-  + instagram_app_id          text
-  + instagram_app_secret      text
-  + instagram_access_token    text
-  + instagram_business_id     text
-  + instagram_page_id         text
-  + instagram_verify_token    text
-  + instagram_enabled         boolean default false
-
-leads
-  + source                    text default 'whatsapp'   -- 'whatsapp' | 'instagram' | 'manual'
-  + instagram_username        text
-  + instagram_user_id         text     -- IGSID, usado para enviar resposta
-  + profile_pic_url           text
-  + email                     text
-  + interest                  text
-  + assigned_to               uuid     -- profiles.user_id
-  + follow_up_date            timestamptz
-  + notes                     text
-  + tags                      text[]   default '{}'
-
-agents
-  + channel                   text default 'whatsapp'   -- 'whatsapp' | 'instagram' | 'both'
+Plataforma (você)                     Cliente final
+─────────────────                     ─────────────
+META_APP_ID         ──── OAuth ────►  Botão "Conectar Instagram"
+META_APP_SECRET                       Login Meta + Autorização
+META_VERIFY_TOKEN                     Token salvo no tenant dele
+WEBHOOK único                  ◄────  DMs chegam em tempo real
 ```
 
-RLS: novas colunas herdam as policies por `company_id` já existentes.
+## Pré-requisitos do revendedor (você, uma vez só)
 
-## Edge Functions novas
+1. Criar um App Meta em developers.facebook.com com produtos:
+   - **Facebook Login for Business**
+   - **Instagram Graph API** + **Webhooks**
+2. Permissões solicitadas: `instagram_basic`, `instagram_manage_messages`, `pages_messaging`, `pages_show_list`, `pages_manage_metadata`, `business_management`
+3. Configurar **Valid OAuth Redirect URI** = URL da edge function `instagram-oauth-callback`
+4. Configurar Webhook único (URL já existente `instagram-webhook`) com Verify Token e assinar o campo `messages`
+5. Informar 3 secrets ao CRM: `META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`
 
-- `instagram-webhook` (público, `verify_jwt = false`): GET para handshake do Meta, POST para receber `messages`/`messaging_postbacks`. Cria lead se não existir (lookup por `instagram_user_id`), grava mensagem `recebida`, dispara IA se `ai_enabled` e robô com canal `instagram`/`both` ativo.
-- `instagram-send`: recebe `{ lead_id, message }`, busca token da empresa, chama `https://graph.facebook.com/v21.0/me/messages` com `messaging_product: "instagram"`, grava mensagem `enviada`.
+> Esses secrets são armazenados no backend da plataforma. Nenhum cliente vê.
 
-Reutiliza `sdr-ai-respond` para gerar a resposta IA (já implementado).
+## Mudanças no banco
 
-## Mudanças de frontend (Fase 1)
+**Remover de `companies`** (não são mais por cliente):
+- `instagram_app_id`, `instagram_app_secret`, `instagram_verify_token`
 
-- `src/pages/Settings.tsx`: nova aba **Instagram** com formulário + status de conexão + URL do webhook copiável.
-- `src/pages/Inbox.tsx`: badge do canal por lead, roteamento de envio (`instagram-send` vs `whatsapp-send`), exibir @username e avatar IG.
-- `src/components/instagram/InstagramSettings.tsx`: componente do formulário.
-- `src/pages/Contatos.tsx`: filtro por canal/origem e novos campos do lead.
+**Manter/usar em `companies`** (preenchidos automaticamente pelo OAuth):
+- `instagram_access_token` (token de longa duração ~60 dias do cliente)
+- `instagram_business_id` (IG Business Account ID)
+- `instagram_page_id` (Page ID vinculada)
+- `instagram_enabled` (true após OAuth bem-sucedido)
 
-## Pré-requisitos do usuário (depois da entrega)
+**Adicionar em `companies`:**
+- `instagram_username` (texto, exibição)
+- `instagram_profile_pic_url` (texto)
+- `instagram_connected_at` (timestamp)
+- `instagram_token_expires_at` (timestamp, para alerta de renovação)
 
-1. App no Meta for Developers com produtos **Instagram Graph API** + **Webhooks**.
-2. Conta Instagram **Business/Creator** ligada a uma **Página do Facebook**.
-3. Permissões aprovadas: `instagram_basic`, `instagram_manage_messages`, `pages_messaging`, `pages_show_list`.
-4. Colar credenciais na nova aba e configurar o Webhook no painel Meta com a URL que o CRM mostra.
+## Edge functions
 
-## Fora do escopo desta entrega
+### 1. `instagram-oauth-start` (nova, autenticada)
+- Recebe `company_id` do usuário logado
+- Gera `state` aleatório (CSRF), salva em tabela `oauth_states` com `company_id` + `expires_at` (10 min)
+- Retorna URL `https://www.facebook.com/v21.0/dialog/oauth?client_id=...&redirect_uri=...&state=...&scope=...`
+- Frontend faz `window.location.href = url`
 
-- Aprovação de App no Meta (processo manual do usuário).
-- Reescrita do Inbox/CRM existente.
-- Novo papel "Manager" (mantém Admin/User atuais; Atendente = User).
-- Notificações push externas — só toasts internos por enquanto.
+### 2. `instagram-oauth-callback` (nova, pública — `verify_jwt = false`)
+- Recebe `?code=...&state=...` da Meta
+- Valida `state` em `oauth_states`, extrai `company_id`, deleta o state
+- Troca `code` → `short_token` no endpoint `/oauth/access_token`
+- Troca `short_token` → `long_token` (60 dias) em `/oauth/access_token?grant_type=fb_exchange_token`
+- Busca Pages do usuário em `/me/accounts` → pega `page_id` + `page_access_token`
+- Busca IG Business Account vinculado: `/{page_id}?fields=instagram_business_account`
+- Busca perfil IG: `/{ig_id}?fields=username,profile_picture_url`
+- Inscreve a Page no webhook: `POST /{page_id}/subscribed_apps?subscribed_fields=messages`
+- Salva em `companies`: token, ig_business_id, page_id, username, pic, expires_at, enabled=true
+- Redireciona para `/{frontend}/configuracoes?instagram=connected`
+
+### 3. `instagram-disconnect` (nova, autenticada)
+- Limpa campos IG da `companies` do usuário, enabled=false
+
+### 4. `instagram-webhook` (existente, ajustar)
+- Continuar usando `META_WEBHOOK_VERIFY_TOKEN` global do env (não mais por empresa)
+- Lookup da empresa continua por `instagram_business_id`
+
+### 5. `instagram-send` (existente, sem mudanças)
+
+## Nova tabela `oauth_states`
+```sql
+id uuid pk, state text unique, company_id uuid, provider text, 
+created_at timestamptz, expires_at timestamptz
+```
+Sem RLS de leitura (só edge functions usam via service role).
+
+## Frontend
+
+### Reescrever `InstagramSettings.tsx`
+Substituir o formulário técnico por um **card de status simples**:
+
+- **Estado desconectado:** ícone Instagram + texto "Conecte sua conta Instagram Business para receber DMs no CRM" + botão grande **"Conectar Instagram"** (chama `instagram-oauth-start` e redireciona)
+- **Estado conectado:** avatar + `@username` + badge verde "Conectado" + data de conexão + botão "Desconectar"
+- Alerta amarelo se `token_expires_at` < 7 dias: "Reconecte sua conta para continuar recebendo mensagens"
+- Detecta `?instagram=connected` ou `?instagram=error=...` na URL e mostra toast
+
+### Sem mudanças necessárias em:
+- Inbox (lead.source === 'instagram' já roteia para `instagram-send`)
+- CRM, Robôs IA, Automações, Dashboard
+
+## Multi-tenant / Isolamento
+- Já garantido por RLS via `company_id` em todas as tabelas (`leads`, `messages`, etc.)
+- O webhook usa `service role` mas resolve `company_id` por `instagram_business_id` único
+- Cada cliente vê apenas leads e DMs da própria empresa
+- Admin da empresa vê quem está conectado no card de status; admin da plataforma (você) vê via banco
+
+## Secrets a adicionar
+- `META_APP_ID`
+- `META_APP_SECRET`
+- `META_WEBHOOK_VERIFY_TOKEN`
+
+## Fora de escopo
+- Renovação automática de token (faremos alerta; renovação é re-OAuth manual em ~60 dias — padrão Meta)
+- Aprovação do App Meta (revisão Meta é responsabilidade sua como revendedor)
+- Painel "super admin" multi-empresa (você consulta via banco se precisar)
