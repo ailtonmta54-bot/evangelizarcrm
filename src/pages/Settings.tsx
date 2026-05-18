@@ -98,6 +98,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {isAdmin && <InstagramSettings />}
+
       {isAdmin && (
         <Card>
           <CardHeader>
