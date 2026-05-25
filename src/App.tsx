@@ -18,6 +18,7 @@ import Produtos from "./pages/Produtos";
 import Settings from "./pages/Settings";
 import Contatos from "./pages/Contatos";
 import NotFound from "./pages/NotFound";
+import DataDeletion from "./pages/DataDeletion";
 
 const queryClient = new QueryClient();
 
