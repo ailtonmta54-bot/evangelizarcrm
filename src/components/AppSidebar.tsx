@@ -50,6 +50,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { isAdmin } = useUserRole();
+  const { workspaces, activeWorkspaceId, setActive } = useActiveWorkspace();
 
   const visibleItems = menuItems.filter((item) => !item.adminOnly || isAdmin);
 
