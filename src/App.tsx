@@ -19,6 +19,7 @@ import Settings from "./pages/Settings";
 import Contatos from "./pages/Contatos";
 import NotFound from "./pages/NotFound";
 import DataDeletion from "./pages/DataDeletion";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
