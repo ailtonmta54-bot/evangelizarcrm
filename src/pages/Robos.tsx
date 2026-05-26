@@ -884,7 +884,7 @@ export default function Robos() {
                   <div className="space-y-2">
                     <Label className="text-xs">Verify Token</Label>
                     <Input
-                      defaultValue={currentAgent.whatsapp_verify_token || ""}
+                      defaultValue={agentSecrets?.whatsapp_verify_token || ""}
                       onBlur={(e) => saveField("whatsapp_verify_token", e.target.value)}
                       placeholder="Token de verificação"
                     />
