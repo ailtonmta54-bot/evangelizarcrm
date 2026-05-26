@@ -34,6 +34,7 @@ import avatarQualificacaoF from "@/assets/avatars/avatar-qualificacao-f.png";
 import avatarAgendamentoM from "@/assets/avatars/avatar-agendamento-m.png";
 import avatarBot2 from "@/assets/avatars/avatar-bot-2.png";
 import avatarVendasF from "@/assets/avatars/avatar-vendas-f.png";
+import { InstagramSettings } from "@/components/instagram/InstagramSettings";
 
 const avatarOptions = [
   { src: avatarAtendimentoF, label: "Atendente" },
