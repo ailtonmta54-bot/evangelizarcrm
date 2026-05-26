@@ -179,6 +179,19 @@ export default function Robos() {
 
   const currentAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
 
+  // Fetch sensitive credentials separately (admin-only RPC)
+  const { data: agentSecrets } = useQuery({
+    queryKey: ["agent-secrets", selectedAgentId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_agent_secrets", { _agent_id: selectedAgentId! });
+      if (error) throw error;
+      return (data?.[0] ?? { whatsapp_token: "", whatsapp_verify_token: "", zapi_token: "" }) as {
+        whatsapp_token: string; whatsapp_verify_token: string; zapi_token: string;
+      };
+    },
+    enabled: !!selectedAgentId,
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!companyId) throw new Error("No company");
@@ -855,7 +868,7 @@ export default function Robos() {
                     <Label className="text-xs">Token de Acesso</Label>
                     <Input
                       type="password"
-                      defaultValue={currentAgent.whatsapp_token || ""}
+                      defaultValue={agentSecrets?.whatsapp_token || ""}
                       onBlur={(e) => saveField("whatsapp_token", e.target.value)}
                       placeholder="Token da API Meta"
                     />
@@ -871,7 +884,7 @@ export default function Robos() {
                   <div className="space-y-2">
                     <Label className="text-xs">Verify Token</Label>
                     <Input
-                      defaultValue={currentAgent.whatsapp_verify_token || ""}
+                      defaultValue={agentSecrets?.whatsapp_verify_token || ""}
                       onBlur={(e) => saveField("whatsapp_verify_token", e.target.value)}
                       placeholder="Token de verificação"
                     />
@@ -923,7 +936,7 @@ export default function Robos() {
                     <Label className="text-xs">Token</Label>
                     <Input
                       type="password"
-                      defaultValue={(currentAgent as any).zapi_token || ""}
+                      defaultValue={agentSecrets?.zapi_token || ""}
                       onBlur={(e) => saveField("zapi_token" as any, e.target.value)}
                       placeholder="Token da instância"
                     />
