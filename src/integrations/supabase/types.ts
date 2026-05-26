@@ -772,6 +772,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_agent_secrets: {
+        Args: { _agent_id: string }
+        Returns: {
+          whatsapp_token: string
+          whatsapp_verify_token: string
+          zapi_token: string
+        }[]
+      }
+      get_company_secrets: {
+        Args: never
+        Returns: {
+          instagram_access_token: string
+          instagram_app_id: string
+          instagram_app_secret: string
+          instagram_verify_token: string
+          openai_api_key: string
+          whatsapp_phone_id: string
+          whatsapp_token: string
+          whatsapp_verify_token: string
+        }[]
+      }
       get_user_company_id: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -780,6 +801,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_company_whatsapp_configured: { Args: never; Returns: boolean }
     }
     Enums: {
       agent_type:
