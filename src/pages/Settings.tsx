@@ -97,7 +97,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      
+      {isAdmin && <WorkspacesSettings />}
+
 
       {isAdmin && (
         <Card>
