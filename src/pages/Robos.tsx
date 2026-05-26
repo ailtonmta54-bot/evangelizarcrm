@@ -868,7 +868,7 @@ export default function Robos() {
                     <Label className="text-xs">Token de Acesso</Label>
                     <Input
                       type="password"
-                      defaultValue={currentAgent.whatsapp_token || ""}
+                      defaultValue={agentSecrets?.whatsapp_token || ""}
                       onBlur={(e) => saveField("whatsapp_token", e.target.value)}
                       placeholder="Token da API Meta"
                     />
