@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 
 import avatarAtendimentoF from "@/assets/avatars/avatar-atendimento-f.png";
 import avatarVendasM from "@/assets/avatars/avatar-vendas-m.png";
