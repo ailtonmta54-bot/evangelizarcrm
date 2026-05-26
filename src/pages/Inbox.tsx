@@ -39,18 +39,16 @@ export default function Inbox() {
     refetchInterval: 3000,
   });
 
-  // Check if WhatsApp is configured
-  const { data: company } = useQuery({
-    queryKey: ["company-whatsapp", companyId],
+  // Check if WhatsApp is configured (without exposing tokens)
+  const { data: whatsappConfigured = false } = useQuery({
+    queryKey: ["company-whatsapp-configured", companyId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("companies").select("whatsapp_token, whatsapp_phone_id").eq("id", companyId!).single();
+      const { data, error } = await supabase.rpc("is_company_whatsapp_configured");
       if (error) throw error;
-      return data;
+      return !!data;
     },
     enabled: !!companyId,
   });
-
-  const whatsappConfigured = !!(company?.whatsapp_token && company?.whatsapp_phone_id);
 
   const sendMutation = useMutation({
     mutationFn: async () => {
