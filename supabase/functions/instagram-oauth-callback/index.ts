@@ -41,22 +41,22 @@ Deno.serve(async (req) => {
   const rawState = url.searchParams.get("state") || "";
   const errorParam = url.searchParams.get("error");
 
-  // Parse return_to from state ("uuid.uuid|https://app/...")
+  // Parse return_to from state ("uuid.uuid|<returnTo or 'popup'>")
   const [stateId, returnTo] = rawState.split("|");
+  const isPopup = returnTo === "popup";
   const fallbackRedirect = returnTo || "/settings";
 
-  if (errorParam) {
-    return redirect(`${fallbackRedirect}?instagram=error&reason=${encodeURIComponent(errorParam)}`);
-  }
-  if (!code || !stateId) {
-    return redirect(`${fallbackRedirect}?instagram=error&reason=missing_code`);
-  }
+  const fail = (reason: string) =>
+    isPopup ? popupResponse("error", reason) : redirect(`${fallbackRedirect}?instagram=error&reason=${encodeURIComponent(reason)}`);
+  const ok = () =>
+    isPopup ? popupResponse("connected") : redirect(`${fallbackRedirect}?instagram=connected`);
+
+  if (errorParam) return fail(errorParam);
+  if (!code || !stateId) return fail("missing_code");
 
   const META_APP_ID = Deno.env.get("META_APP_ID");
   const META_APP_SECRET = Deno.env.get("META_APP_SECRET");
-  if (!META_APP_ID || !META_APP_SECRET) {
-    return redirect(`${fallbackRedirect}?instagram=error&reason=platform_not_configured`);
-  }
+  if (!META_APP_ID || !META_APP_SECRET) return fail("platform_not_configured");
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
