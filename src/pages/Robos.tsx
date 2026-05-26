@@ -200,12 +200,14 @@ export default function Robos() {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!companyId) throw new Error("No company");
+      if (!activeWorkspaceId) throw new Error("Selecione um workspace");
       if (!createName.trim()) throw new Error("Nome é obrigatório");
       const { data, error } = await supabase.from("agents").insert({
         name: createName,
         description: createDesc,
         agent_type: createType as any,
         company_id: companyId,
+        workspace_id: activeWorkspaceId,
       }).select("*").single();
       if (error) throw error;
       return data;
@@ -219,8 +221,13 @@ export default function Robos() {
       setCreateType("vendas");
       setSelectedAgentId(data.id);
     },
-    onError: (e) => toast.error(e.message || "Erro ao criar"),
+    onError: (e: any) => {
+      const msg = e?.message || "Erro ao criar";
+      // Mensagem do trigger de limite vem como "... 5 robôs."
+      toast.error(msg.includes("limite de 5") ? "Este workspace já atingiu o limite de 5 robôs." : msg);
+    },
   });
+
 
   const updateField = useMutation({
     mutationFn: async (updates: Record<string, any>) => {
