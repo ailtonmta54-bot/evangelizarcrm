@@ -842,6 +842,9 @@ export default function Robos() {
 
           {/* === INTEGRAÇÕES === */}
           <TabsContent value="integracoes" className="space-y-4 mt-4">
+            {/* Instagram (nível empresa) */}
+            <InstagramSettings />
+
             {/* WhatsApp */}
             <Card
               className="cursor-pointer transition-all hover:border-primary/30"
