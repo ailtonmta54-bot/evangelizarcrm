@@ -70,7 +70,22 @@ export function InstagramSettings() {
         console.error("instagram-oauth-start error:", error || data?.error);
         throw new Error("Instagram connection could not start. Please check platform configuration.");
       }
-      window.location.href = data.url;
+      // Facebook bloqueia ser aberto em iframe (X-Frame-Options).
+      // Se estivermos em iframe (preview do Lovable), abrimos na janela TOPO ou nova aba.
+      const inIframe = window.self !== window.top;
+      if (inIframe) {
+        const opened = window.open(data.url, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          // Popup bloqueado: força a janela topo a navegar
+          try {
+            window.top!.location.href = data.url;
+          } catch {
+            window.location.href = data.url;
+          }
+        }
+      } else {
+        window.location.href = data.url;
+      }
     },
     onError: (err: Error) => toast.error(err.message),
   });
