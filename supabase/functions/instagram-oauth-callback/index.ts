@@ -9,6 +9,30 @@ function redirect(url: string) {
   return new Response(null, { status: 302, headers: { Location: url, ...corsHeaders } });
 }
 
+function popupResponse(status: "connected" | "error", reason?: string) {
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Instagram</title>
+<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0f172a;color:#fff;text-align:center;padding:24px}</style>
+</head><body><div>
+<h2>${status === "connected" ? "✅ Instagram conectado!" : "❌ Falha na conexão"}</h2>
+<p>${status === "connected" ? "Pode fechar esta janela." : (reason || "Erro desconhecido")}</p>
+</div>
+<script>
+(function(){
+  try {
+    if (window.opener) {
+      window.opener.postMessage({ type: "instagram-oauth", status: ${JSON.stringify(status)}, reason: ${JSON.stringify(reason || "")} }, "*");
+    }
+  } catch(e) {}
+  setTimeout(function(){ try { window.close(); } catch(e){} }, 600);
+})();
+</script>
+</body></html>`;
+  return new Response(html, {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
