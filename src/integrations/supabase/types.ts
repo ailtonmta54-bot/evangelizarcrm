@@ -187,6 +187,42 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          resource_id: string | null
+          resource_type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       automation_logs: {
         Row: {
           automation_id: string
@@ -831,7 +867,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
       is_company_whatsapp_configured: { Args: never; Returns: boolean }
+      is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       agent_type:
@@ -841,7 +880,7 @@ export type Database = {
         | "qualificacao"
         | "agendamento"
         | "custom"
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "owner" | "manager"
       lead_status:
         | "novo"
         | "atendimento"
@@ -986,7 +1025,7 @@ export const Constants = {
         "agendamento",
         "custom",
       ],
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "owner", "manager"],
       lead_status: [
         "novo",
         "atendimento",

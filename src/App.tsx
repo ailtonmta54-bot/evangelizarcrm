@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { RoleGuard } from "@/components/RoleGuard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -46,11 +47,13 @@ const App = () => (
                 <Route path="/inbox" element={<Inbox />} />
                 <Route path="/contatos" element={<Contatos />} />
                 <Route path="/crm" element={<Crm />} />
-                <Route path="/robos" element={<Robos />} />
-                <Route path="/automacoes" element={<Automacoes />} />
-                <Route path="/automacoes/flow/:flowId" element={<FlowEditor />} />
+                <Route element={<RoleGuard required="admin" />}>
+                  <Route path="/robos" element={<Robos />} />
+                  <Route path="/automacoes" element={<Automacoes />} />
+                  <Route path="/automacoes/flow/:flowId" element={<FlowEditor />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Route>
                 <Route path="/produtos" element={<Produtos />} />
-                <Route path="/settings" element={<Settings />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
