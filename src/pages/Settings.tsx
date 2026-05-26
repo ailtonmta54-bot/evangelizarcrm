@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Save, Users, ShieldCheck, User } from "lucide-react";
+import { WorkspacesSettings } from "@/components/workspaces/WorkspacesSettings";
 import { toast } from "sonner";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -97,7 +98,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      
+      {isAdmin && <WorkspacesSettings />}
+
 
       {isAdmin && (
         <Card>

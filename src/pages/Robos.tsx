@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 
 import avatarAtendimentoF from "@/assets/avatars/avatar-atendimento-f.png";
 import avatarVendasM from "@/assets/avatars/avatar-vendas-m.png";
@@ -90,6 +91,7 @@ const statusConfig = {
 
 export default function Robos() {
   const companyId = useCompanyId();
+  const { activeWorkspaceId } = useActiveWorkspace();
   const queryClient = useQueryClient();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -115,17 +117,19 @@ export default function Robos() {
   const [websiteContent, setWebsiteContent] = useState<string | null>(null);
 
   const { data: agents = [], isLoading } = useQuery({
-    queryKey: ["agents", companyId],
+    queryKey: ["agents", activeWorkspaceId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agents")
         .select("*")
+        .eq("workspace_id", activeWorkspaceId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!companyId,
+    enabled: !!activeWorkspaceId,
   });
+
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", companyId],
@@ -196,12 +200,14 @@ export default function Robos() {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!companyId) throw new Error("No company");
+      if (!activeWorkspaceId) throw new Error("Selecione um workspace");
       if (!createName.trim()) throw new Error("Nome é obrigatório");
       const { data, error } = await supabase.from("agents").insert({
         name: createName,
         description: createDesc,
         agent_type: createType as any,
         company_id: companyId,
+        workspace_id: activeWorkspaceId,
       }).select("*").single();
       if (error) throw error;
       return data;
@@ -215,8 +221,13 @@ export default function Robos() {
       setCreateType("vendas");
       setSelectedAgentId(data.id);
     },
-    onError: (e) => toast.error(e.message || "Erro ao criar"),
+    onError: (e: any) => {
+      const msg = e?.message || "Erro ao criar";
+      // Mensagem do trigger de limite vem como "... 5 robôs."
+      toast.error(msg.includes("limite de 5") ? "Este workspace já atingiu o limite de 5 robôs." : msg);
+    },
   });
+
 
   const updateField = useMutation({
     mutationFn: async (updates: Record<string, any>) => {
