@@ -14,7 +14,6 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useUserRole } from "@/hooks/use-user-role";
-import { Badge } from "@/components/ui/badge";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import {
   Select,
@@ -50,7 +49,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { isAdmin } = useUserRole();
-  const { workspaces, activeWorkspaceId, setActive } = useActiveWorkspace();
+  const { workspaces, activeWorkspaceId, setActive, isLoading } = useActiveWorkspace();
 
   const visibleItems = menuItems.filter((item) => !item.adminOnly || isAdmin);
 
@@ -66,26 +65,36 @@ export function AppSidebar() {
           )}
         </div>
 
-        {!collapsed && workspaces.length > 0 && (
+        {!collapsed && (
           <div className="px-3 pb-3">
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium px-1 mb-1.5 flex items-center gap-1">
               <Briefcase className="h-3 w-3" /> Workspace
             </label>
-            <Select
-              value={activeWorkspaceId || undefined}
-              onValueChange={(v) => setActive(v)}
-            >
-              <SelectTrigger className="h-9 bg-sidebar-accent/40 border-sidebar-border">
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                {workspaces.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isLoading ? (
+              <div className="h-9 rounded-md border border-sidebar-border bg-sidebar-accent/40 px-3 flex items-center text-xs text-muted-foreground">
+                Carregando workspace...
+              </div>
+            ) : workspaces.length > 0 ? (
+              <Select
+                value={activeWorkspaceId || undefined}
+                onValueChange={(v) => setActive(v)}
+              >
+                <SelectTrigger className="h-9 bg-sidebar-accent/40 border-sidebar-border">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {workspaces.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="h-9 rounded-md border border-sidebar-border bg-sidebar-accent/40 px-3 flex items-center text-xs text-muted-foreground">
+                Nenhum workspace encontrado
+              </div>
+            )}
           </div>
         )}
 
