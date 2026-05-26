@@ -66,6 +66,30 @@ export function AppSidebar() {
           )}
         </div>
 
+        {!collapsed && workspaces.length > 0 && (
+          <div className="px-3 pb-3">
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium px-1 mb-1.5 flex items-center gap-1">
+              <Briefcase className="h-3 w-3" /> Workspace
+            </label>
+            <Select
+              value={activeWorkspaceId || undefined}
+              onValueChange={(v) => setActive(v)}
+            >
+              <SelectTrigger className="h-9 bg-sidebar-accent/40 border-sidebar-border">
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                {workspaces.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
