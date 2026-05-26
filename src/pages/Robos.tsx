@@ -936,7 +936,7 @@ export default function Robos() {
                     <Label className="text-xs">Token</Label>
                     <Input
                       type="password"
-                      defaultValue={(currentAgent as any).zapi_token || ""}
+                      defaultValue={agentSecrets?.zapi_token || ""}
                       onBlur={(e) => saveField("zapi_token" as any, e.target.value)}
                       placeholder="Token da instância"
                     />
