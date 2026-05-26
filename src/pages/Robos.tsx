@@ -117,17 +117,19 @@ export default function Robos() {
   const [websiteContent, setWebsiteContent] = useState<string | null>(null);
 
   const { data: agents = [], isLoading } = useQuery({
-    queryKey: ["agents", companyId],
+    queryKey: ["agents", activeWorkspaceId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agents")
         .select("*")
+        .eq("workspace_id", activeWorkspaceId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!companyId,
+    enabled: !!activeWorkspaceId,
   });
+
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", companyId],
