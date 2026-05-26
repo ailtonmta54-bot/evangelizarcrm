@@ -91,6 +91,7 @@ const statusConfig = {
 
 export default function Robos() {
   const companyId = useCompanyId();
+  const { activeWorkspaceId } = useActiveWorkspace();
   const queryClient = useQueryClient();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
