@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Save, Users, ShieldCheck, User } from "lucide-react";
-import { InstagramSettings } from "@/components/instagram/InstagramSettings";
 import { toast } from "sonner";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
