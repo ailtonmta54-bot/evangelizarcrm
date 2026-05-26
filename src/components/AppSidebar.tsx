@@ -9,11 +9,20 @@ import {
   Settings,
   Cross,
   ShieldCheck,
+  Briefcase,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useUserRole } from "@/hooks/use-user-role";
 import { Badge } from "@/components/ui/badge";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sidebar,
   SidebarContent,
