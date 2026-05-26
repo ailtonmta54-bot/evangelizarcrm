@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!stateRow || new Date(stateRow.expires_at).getTime() < Date.now()) {
-      return redirect(`${fallbackRedirect}?instagram=error&reason=invalid_state`);
+      return fail("invalid_state");
     }
     await supabase.from("oauth_states").delete().eq("id", stateRow.id);
     const companyId = stateRow.company_id;
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     const shortData = await shortRes.json();
     if (!shortRes.ok || !shortData.access_token) {
       console.error("short token error", shortData);
-      return redirect(`${fallbackRedirect}?instagram=error&reason=token_exchange`);
+      return fail("token_exchange");
     }
 
     // 3. Exchange to long-lived (60 days)
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     const longData = await longRes.json();
     if (!longRes.ok || !longData.access_token) {
       console.error("long token error", longData);
-      return redirect(`${fallbackRedirect}?instagram=error&reason=long_token`);
+      return fail("long_token");
     }
     const userAccessToken: string = longData.access_token;
     const expiresIn: number = longData.expires_in || 60 * 24 * 3600;
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
     const pages: any[] = pagesData.data || [];
     const pageWithIg = pages.find((p) => p.instagram_business_account?.id);
     if (!pageWithIg) {
-      return redirect(`${fallbackRedirect}?instagram=error&reason=no_instagram_business_account`);
+      return fail("no_instagram_business_account");
     }
 
     const pageId: string = pageWithIg.id;
@@ -157,12 +157,12 @@ Deno.serve(async (req) => {
 
     if (upErr) {
       console.error("save company error", upErr);
-      return redirect(`${fallbackRedirect}?instagram=error&reason=save_failed`);
+      return fail("save_failed");
     }
 
-    return redirect(`${fallbackRedirect}?instagram=connected`);
+    return ok();
   } catch (e) {
     console.error("oauth-callback error", e);
-    return redirect(`${fallbackRedirect}?instagram=error&reason=unexpected`);
+    return fail("unexpected");
   }
 });
