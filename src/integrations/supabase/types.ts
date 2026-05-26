@@ -88,6 +88,7 @@ export type Database = {
           whatsapp_provider: string | null
           whatsapp_token: string | null
           whatsapp_verify_token: string | null
+          workspace_id: string | null
           zapi_enabled: boolean | null
           zapi_instance_id: string | null
           zapi_token: string | null
@@ -129,6 +130,7 @@ export type Database = {
           whatsapp_provider?: string | null
           whatsapp_token?: string | null
           whatsapp_verify_token?: string | null
+          workspace_id?: string | null
           zapi_enabled?: boolean | null
           zapi_instance_id?: string | null
           zapi_token?: string | null
@@ -170,6 +172,7 @@ export type Database = {
           whatsapp_provider?: string | null
           whatsapp_token?: string | null
           whatsapp_verify_token?: string | null
+          workspace_id?: string | null
           zapi_enabled?: boolean | null
           zapi_instance_id?: string | null
           zapi_token?: string | null
@@ -669,6 +672,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active_workspace_id: string | null
           company_id: string
           created_at: string
           full_name: string
@@ -677,6 +681,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          active_workspace_id?: string | null
           company_id: string
           created_at?: string
           full_name?: string
@@ -685,6 +690,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          active_workspace_id?: string | null
           company_id?: string
           created_at?: string
           full_name?: string
@@ -764,6 +770,30 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      workspaces: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
