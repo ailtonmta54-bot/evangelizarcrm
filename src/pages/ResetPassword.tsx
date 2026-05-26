@@ -16,13 +16,20 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        setReady(true);
-      }
+    // Supabase processa o hash da URL automaticamente e cria a sessão
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) setReady(true);
     });
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
+      if (data.session) {
+        setReady(true);
+      } else {
+        // Tenta novamente após um pequeno delay (caso o hash ainda esteja sendo processado)
+        setTimeout(async () => {
+          const { data: d2 } = await supabase.auth.getSession();
+          if (d2.session) setReady(true);
+        }, 800);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
