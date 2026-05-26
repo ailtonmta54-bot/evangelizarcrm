@@ -64,31 +64,57 @@ export function InstagramSettings() {
   const connectMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("instagram-oauth-start", {
-        body: { return_to: window.location.origin + "/settings" },
+        body: { return_to: "popup" },
       });
       if (error || data?.error || !data?.url) {
         console.error("instagram-oauth-start error:", error || data?.error);
-        throw new Error("Instagram connection could not start. Please check platform configuration.");
+        throw new Error("Não foi possível iniciar a conexão com o Instagram.");
       }
-      // Facebook bloqueia ser aberto em iframe (X-Frame-Options).
-      // Se estivermos em iframe (preview do Lovable), abrimos na janela TOPO ou nova aba.
-      const inIframe = window.self !== window.top;
-      if (inIframe) {
-        const opened = window.open(data.url, "_blank", "noopener,noreferrer");
-        if (!opened) {
-          // Popup bloqueado: força a janela topo a navegar
-          try {
-            window.top!.location.href = data.url;
-          } catch {
-            window.location.href = data.url;
+
+      // Abre popup centrado
+      const w = 600;
+      const h = 720;
+      const left = window.screenX + (window.outerWidth - w) / 2;
+      const top = window.screenY + (window.outerHeight - h) / 2;
+      const popup = window.open(
+        data.url,
+        "ig-oauth",
+        `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=no`
+      );
+
+      if (!popup) {
+        throw new Error("Popup bloqueado. Permita popups para este site e tente novamente.");
+      }
+
+      // Aguarda mensagem do callback OU fechamento do popup
+      return await new Promise<void>((resolve, reject) => {
+        const handler = (event: MessageEvent) => {
+          if (!event.data || event.data.type !== "instagram-oauth") return;
+          window.removeEventListener("message", handler);
+          clearInterval(checkClosed);
+          try { popup.close(); } catch {}
+          if (event.data.status === "connected") {
+            toast.success("Instagram conectado com sucesso!");
+            queryClient.invalidateQueries({ queryKey: ["instagram-status"] });
+            resolve();
+          } else {
+            reject(new Error(`Falha ao conectar (${event.data.reason || "desconhecido"})`));
           }
-        }
-      } else {
-        window.location.href = data.url;
-      }
+        };
+        window.addEventListener("message", handler);
+
+        const checkClosed = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkClosed);
+            window.removeEventListener("message", handler);
+            reject(new Error("Conexão cancelada"));
+          }
+        }, 800);
+      });
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
