@@ -179,6 +179,19 @@ export default function Robos() {
 
   const currentAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
 
+  // Fetch sensitive credentials separately (admin-only RPC)
+  const { data: agentSecrets } = useQuery({
+    queryKey: ["agent-secrets", selectedAgentId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_agent_secrets", { _agent_id: selectedAgentId! });
+      if (error) throw error;
+      return (data?.[0] ?? { whatsapp_token: "", whatsapp_verify_token: "", zapi_token: "" }) as {
+        whatsapp_token: string; whatsapp_verify_token: string; zapi_token: string;
+      };
+    },
+    enabled: !!selectedAgentId,
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!companyId) throw new Error("No company");
