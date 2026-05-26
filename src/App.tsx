@@ -19,6 +19,7 @@ import Settings from "./pages/Settings";
 import Contatos from "./pages/Contatos";
 import NotFound from "./pages/NotFound";
 import DataDeletion from "./pages/DataDeletion";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
