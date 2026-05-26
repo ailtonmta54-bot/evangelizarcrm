@@ -37,6 +37,8 @@ import avatarBot2 from "@/assets/avatars/avatar-bot-2.png";
 import avatarVendasF from "@/assets/avatars/avatar-vendas-f.png";
 import { InstagramSettings } from "@/components/instagram/InstagramSettings";
 
+const MAX_AGENTS_PER_WORKSPACE = 5;
+
 const avatarOptions = [
   { src: avatarAtendimentoF, label: "Atendente" },
   { src: avatarVendasM, label: "Vendedor" },
@@ -91,7 +93,8 @@ const statusConfig = {
 
 export default function Robos() {
   const companyId = useCompanyId();
-  const { activeWorkspaceId } = useActiveWorkspace();
+  const { activeWorkspace } = useActiveWorkspace();
+  const activeWorkspaceId = activeWorkspace?.id || null;
   const queryClient = useQueryClient();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -1078,7 +1081,7 @@ export default function Robos() {
                   </div>
                   <div>
                     <CardTitle className="text-sm">Chat de Teste - {currentAgent.name}</CardTitle>
-                    <CardDescription className="text-xs">Teste o comportamento do robô antes de colocar em produção</CardDescription>
+          <CardDescription className="text-xs">Teste o comportamento do robô antes de colocar em produção</CardDescription>
                   </div>
                   {testMessages.length > 0 && (
                     <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={() => setTestMessages([])}>
@@ -1150,12 +1153,38 @@ export default function Robos() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Robôs IA</h1>
-          <p className="text-muted-foreground">Crie e gerencie seus agentes de inteligência artificial</p>
+          <p className="text-muted-foreground">
+            Crie e gerencie seus agentes de inteligência artificial
+            {activeWorkspace?.name ? ` no workspace ${activeWorkspace.name}` : ""}
+          </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+        <Button
+          onClick={() => {
+            if (agents.length >= MAX_AGENTS_PER_WORKSPACE) {
+              toast.error("Este workspace já atingiu o limite de 5 robôs.");
+              return;
+            }
+            setCreateDialogOpen(true);
+          }}
+          disabled={!activeWorkspaceId || agents.length >= MAX_AGENTS_PER_WORKSPACE}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" /> Criar Robô
         </Button>
       </div>
+      {activeWorkspace && (
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Workspace ativo: {activeWorkspace.name}</p>
+              <p className="text-xs text-muted-foreground">{agents.length}/{MAX_AGENTS_PER_WORKSPACE} robôs usados neste workspace</p>
+            </div>
+            {agents.length >= MAX_AGENTS_PER_WORKSPACE && (
+              <Badge variant="secondary">Limite atingido</Badge>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Avatar Picker Dialog */}
       <Dialog open={avatarPickerOpen} onOpenChange={setAvatarPickerOpen}>
