@@ -74,30 +74,39 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    console.log("IG webhook payload:", JSON.stringify(body));
+    console.log("[ig-webhook] payload:", JSON.stringify(body));
 
-    // Instagram messaging webhook structure: entry[].messaging[]
+    const object = body?.object;
     const entries = body?.entry || [];
+    console.log(`[ig-webhook] object=${object} entries=${entries.length}`);
 
     for (const entry of entries) {
-      const igBusinessId = entry.id; // Instagram Business Account ID
-      const messagingEvents = entry.messaging || [];
+      const entryId = entry.id; // Could be IG Business Account ID OR Page ID
+      const messagingEvents = entry.messaging || entry.changes || [];
+      console.log(`[ig-webhook] entry.id=${entryId} events=${messagingEvents.length}`);
 
-      // Find company by business_id
-      const { data: company } = await supabase
+      // Try to find company by either instagram_business_id OR instagram_page_id
+      const { data: companies } = await supabase
         .from("companies")
-        .select("id, instagram_access_token, instagram_business_id")
-        .eq("instagram_business_id", igBusinessId)
+        .select("id, instagram_access_token, instagram_business_id, instagram_page_id")
         .eq("instagram_enabled", true)
-        .maybeSingle();
+        .or(`instagram_business_id.eq.${entryId},instagram_page_id.eq.${entryId}`);
 
+      const company = companies?.[0];
       if (!company) {
-        console.error("No company found for IG business id:", igBusinessId);
+        console.error("[ig-webhook] no company for entry.id:", entryId);
         continue;
       }
 
       const companyId = company.id;
       const accessToken = company.instagram_access_token;
+
+      // Track last webhook received for UI health indicator
+      await supabase
+        .from("companies")
+        .update({ instagram_last_webhook_at: new Date().toISOString() })
+        .eq("id", companyId);
+
 
       for (const evt of messagingEvents) {
         // Ignore echoes (messages we sent ourselves)
