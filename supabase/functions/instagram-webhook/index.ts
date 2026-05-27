@@ -110,14 +110,24 @@ Deno.serve(async (req) => {
 
       for (const evt of messagingEvents) {
         // Ignore echoes (messages we sent ourselves)
-        if (evt.message?.is_echo) continue;
+        if (evt.message?.is_echo) {
+          console.log("[ig-webhook] skip echo");
+          continue;
+        }
 
         const senderId = evt.sender?.id;
-        const recipientId = evt.recipient?.id;
-        if (!senderId || senderId === igBusinessId) continue;
+        if (!senderId || senderId === company.instagram_business_id || senderId === company.instagram_page_id) {
+          console.log("[ig-webhook] skip self/empty sender");
+          continue;
+        }
 
         const messageText: string = evt.message?.text || (evt.message?.attachments ? "[mídia]" : "");
-        if (!messageText) continue;
+        if (!messageText) {
+          console.log("[ig-webhook] skip empty message");
+          continue;
+        }
+        console.log(`[ig-webhook] message from ${senderId}: ${messageText.slice(0, 80)}`);
+
 
         // Find or create lead by instagram_user_id
         let { data: lead } = await supabase
