@@ -286,16 +286,18 @@ export function InstagramSettings() {
             })()}
 
             <div className="flex items-center justify-between p-3 rounded-lg border">
-
               <div>
                 <Label className="text-sm font-medium">Bot de IA no Instagram Direct</Label>
-                <p className="text-xs text-muted-foreground">Responder mensagens automaticamente com IA</p>
+                <p className="text-xs text-muted-foreground">
+                  {(company as any)?.instagram_bot_enabled !== false ? "Bot ativo — respondendo automaticamente" : "Bot inativo — modo manual"}
+                </p>
               </div>
               <Switch
-                checked={!!company?.instagram_enabled}
-                onCheckedChange={(v) => toggleEnabledMutation.mutate(v)}
+                checked={(company as any)?.instagram_bot_enabled !== false}
+                onCheckedChange={(v) => toggleBotMutation.mutate(v)}
               />
             </div>
+
 
             <div className="flex items-center justify-between p-3 rounded-lg border">
               <div>
