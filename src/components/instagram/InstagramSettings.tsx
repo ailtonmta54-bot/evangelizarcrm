@@ -26,8 +26,9 @@ export function InstagramSettings() {
       const { data, error } = await supabase
         .from("companies")
         .select(
-          "instagram_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at, instagram_last_webhook_at"
+          "instagram_enabled, instagram_bot_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at, instagram_last_webhook_at"
         )
+
 
         .eq("id", companyId!)
         .single();
