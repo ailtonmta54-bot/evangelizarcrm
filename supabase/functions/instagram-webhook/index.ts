@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
 
         if (!lead) {
           // Try to fetch profile info
-          const profile = await fetchIgProfile(accessToken, senderId, igBusinessId);
+          const profile = await fetchIgProfile(accessToken, senderId, company.instagram_business_id);
           const displayName = profile?.name || profile?.username || `IG ${senderId.slice(-6)}`;
           const username = profile?.username || "";
           const picUrl = profile?.profile_pic || "";
