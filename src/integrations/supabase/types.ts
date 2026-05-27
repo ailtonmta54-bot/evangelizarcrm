@@ -322,6 +322,7 @@ export type Database = {
           instagram_business_id: string | null
           instagram_connected_at: string | null
           instagram_enabled: boolean
+          instagram_last_webhook_at: string | null
           instagram_page_id: string | null
           instagram_profile_pic_url: string | null
           instagram_token_expires_at: string | null
@@ -343,6 +344,7 @@ export type Database = {
           instagram_business_id?: string | null
           instagram_connected_at?: string | null
           instagram_enabled?: boolean
+          instagram_last_webhook_at?: string | null
           instagram_page_id?: string | null
           instagram_profile_pic_url?: string | null
           instagram_token_expires_at?: string | null
@@ -364,6 +366,7 @@ export type Database = {
           instagram_business_id?: string | null
           instagram_connected_at?: string | null
           instagram_enabled?: boolean
+          instagram_last_webhook_at?: string | null
           instagram_page_id?: string | null
           instagram_profile_pic_url?: string | null
           instagram_token_expires_at?: string | null

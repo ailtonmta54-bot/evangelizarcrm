@@ -161,13 +161,25 @@ Deno.serve(async (req) => {
     );
     const profData = await profRes.json();
 
-    // 6. Subscribe page to messaging webhook
-    const subRes = await fetch(
+    // 6. Subscribe Page to messaging webhook (Messenger-style routing)
+    const subPageRes = await fetch(
       `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks&access_token=${pageAccessToken}`,
       { method: "POST" }
     );
-    const subData = await subRes.json();
-    if (!subRes.ok) console.error("webhook subscribe warning:", subData);
+    const subPageData = await subPageRes.json();
+    console.log("[oauth] page subscribed_apps result:", JSON.stringify(subPageData));
+    if (!subPageRes.ok) console.error("[oauth] page subscribe FAILED:", subPageData);
+
+    // 6b. Subscribe Instagram Business Account directly (required for IG DM webhooks)
+    const subIgRes = await fetch(
+      `https://graph.facebook.com/v21.0/${igBusinessId}/subscribed_apps?subscribed_fields=messages&access_token=${pageAccessToken}`,
+      { method: "POST" }
+    );
+    const subIgData = await subIgRes.json();
+    console.log("[oauth] IG subscribed_apps result:", JSON.stringify(subIgData));
+    if (!subIgRes.ok) console.error("[oauth] IG subscribe FAILED:", subIgData);
+
+    console.log("[oauth] saving company", { companyId, pageId, igBusinessId, username: profData?.username });
 
     // 7. Save to company
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -184,6 +196,7 @@ Deno.serve(async (req) => {
         instagram_enabled: true,
       })
       .eq("id", companyId);
+
 
     if (upErr) {
       console.error("save company error", upErr);

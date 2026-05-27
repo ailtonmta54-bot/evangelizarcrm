@@ -1,0 +1,1 @@
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS instagram_last_webhook_at TIMESTAMPTZ;
