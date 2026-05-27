@@ -10,26 +10,56 @@ function redirect(url: string) {
 }
 
 function popupResponse(status: "connected" | "error", reason?: string) {
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Instagram</title>
+  const title = status === "connected" ? "Instagram conectado!" : "Falha na conexão";
+  const msg = status === "connected" ? "Pode fechar esta janela." : (reason || "Erro desconhecido");
+  const fallbackUrl = status === "connected"
+    ? "/settings?instagram=connected"
+    : `/settings?instagram=error&reason=${encodeURIComponent(reason || "unknown")}`;
+  const html = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Instagram</title>
 <style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0f172a;color:#fff;text-align:center;padding:24px}</style>
-</head><body><div>
-<h2>${status === "connected" ? "✅ Instagram conectado!" : "❌ Falha na conexão"}</h2>
-<p>${status === "connected" ? "Pode fechar esta janela." : (reason || "Erro desconhecido")}</p>
+</head>
+<body>
+<div>
+<h2>${title}</h2>
+<p>${msg}</p>
 </div>
 <script>
 (function(){
+  var payload = { type: "instagram-oauth", status: ${JSON.stringify(status)}, reason: ${JSON.stringify(reason || "")} };
+  var notified = false;
   try {
-    if (window.opener) {
-      window.opener.postMessage({ type: "instagram-oauth", status: ${JSON.stringify(status)}, reason: ${JSON.stringify(reason || "")} }, "*");
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage(payload, "*");
+      notified = true;
     }
   } catch(e) {}
-  setTimeout(function(){ try { window.close(); } catch(e){} }, 600);
+  setTimeout(function(){
+    try { window.close(); } catch(e) {}
+    setTimeout(function(){
+      if (!window.closed) {
+        window.location.replace(${JSON.stringify(fallbackUrl)});
+      }
+    }, 400);
+  }, 500);
 })();
 </script>
-</body></html>`;
-  return new Response(html, {
+</body>
+</html>`;
+  const bytes = new TextEncoder().encode(html);
+  return new Response(bytes, {
     status: 200,
-    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": String(bytes.byteLength),
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }
 
