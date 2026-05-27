@@ -90,7 +90,21 @@ export default function Inbox() {
     },
   });
 
+  const toggleLeadAi = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!selectedLead) return;
+      const { error } = await supabase.from("leads").update({ ai_enabled: enabled }).eq("id", selectedLead.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, enabled) => {
+      toast.success(enabled ? "Bot ativado nesta conversa" : "Atendimento humano ativado");
+      queryClient.invalidateQueries({ queryKey: ["inbox-leads"] });
+    },
+    onError: (err: Error) => toast.error(err.message || "Erro"),
+  });
+
   const filtered = leads.filter((l) => l.name.toLowerCase().includes(search.toLowerCase()));
+
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
