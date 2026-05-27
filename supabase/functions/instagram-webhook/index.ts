@@ -169,12 +169,15 @@ Deno.serve(async (req) => {
         }
 
         // Save incoming message
-        await supabase.from("messages").insert({
+        const { error: msgErr } = await supabase.from("messages").insert({
           lead_id: lead.id,
           content: messageText,
           type: "recebida",
           company_id: companyId,
         });
+        if (msgErr) console.error("[ig-webhook] save message error:", msgErr);
+        else console.log("[ig-webhook] message stored for lead", lead.id);
+
 
         // Auto-tag
         const newTags = autoTagsFor(messageText);
