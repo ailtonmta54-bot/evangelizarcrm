@@ -170,23 +170,28 @@ Deno.serve(async (req) => {
         // AI auto-reply
         if (lead.ai_enabled) {
           try {
-            // Find best IG agent
-            const { data: agents } = await supabase
+            // Find best agent: prefer Instagram/both, fallback to any active agent
+            const { data: allAgents } = await supabase
               .from("agents")
               .select("*")
               .eq("company_id", companyId)
-              .eq("active", true)
-              .in("channel", ["instagram", "both"]);
+              .eq("active", true);
+
+            const igAgents = (allAgents || []).filter((a: any) =>
+              ["instagram", "both"].includes(a.channel)
+            );
+            const pool = igAgents.length > 0 ? igAgents : (allAgents || []);
 
             const agent =
-              (lead.agent_id && agents?.find((a) => a.id === lead.agent_id)) ||
-              agents?.find((a) => a.is_default) ||
-              agents?.[0];
+              (lead.agent_id && pool.find((a: any) => a.id === lead.agent_id)) ||
+              pool.find((a: any) => a.is_default) ||
+              pool[0];
 
             if (!agent) {
-              console.log("No active IG agent for company:", companyId);
+              console.log("No active agent for company:", companyId);
               continue;
             }
+            console.log(`IG using agent "${agent.name}" (channel=${agent.channel})`);
 
             if (!lead.agent_id) {
               await supabase.from("leads").update({ agent_id: agent.id }).eq("id", lead.id);
