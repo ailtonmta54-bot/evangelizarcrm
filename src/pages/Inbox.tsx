@@ -178,17 +178,31 @@ export default function Inbox() {
                   </p>
                 </div>
               </div>
-              {(selectedLead as any).source === "instagram" ? (
-                <div className="flex items-center gap-1 text-xs text-pink-600">
-                  <Instagram className="h-3 w-3" />
-                  <span>Instagram</span>
+              <div className="flex items-center gap-3">
+                {(selectedLead as any).source === "instagram" ? (
+                  <div className="flex items-center gap-1 text-xs text-pink-600">
+                    <Instagram className="h-3 w-3" />
+                    <span>Instagram Direct</span>
+                  </div>
+                ) : whatsappConfigured && (
+                  <div className="flex items-center gap-1 text-xs text-primary">
+                    <MessageSquare className="h-3 w-3" />
+                    <span>WhatsApp ativo</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 pl-3 border-l">
+                  <Bot className={cn("h-4 w-4", (selectedLead as any).ai_enabled ? "text-emerald-600" : "text-muted-foreground")} />
+                  <Label htmlFor="lead-bot-toggle" className="text-xs cursor-pointer">
+                    {(selectedLead as any).ai_enabled ? "Bot ativo" : "Humano"}
+                  </Label>
+                  <Switch
+                    id="lead-bot-toggle"
+                    checked={!!(selectedLead as any).ai_enabled}
+                    onCheckedChange={(v) => toggleLeadAi.mutate(v)}
+                  />
                 </div>
-              ) : whatsappConfigured && (
-                <div className="flex items-center gap-1 text-xs text-primary">
-                  <MessageSquare className="h-3 w-3" />
-                  <span>WhatsApp ativo</span>
-                </div>
-              )}
+              </div>
+
             </div>
 
             <div className="flex-1 overflow-auto p-4 space-y-3 scrollbar-thin">
