@@ -85,27 +85,29 @@ Deno.serve(async (req) => {
       const messagingEvents = entry.messaging || entry.changes || [];
       console.log(`[ig-webhook] entry.id=${entryId} events=${messagingEvents.length}`);
 
-      // Try to find company by either instagram_business_id OR instagram_page_id
+      // Find company by either instagram_business_id OR instagram_page_id
+      // (don't require instagram_enabled — that's used as connection flag; bot toggle is separate)
       const { data: companies } = await supabase
         .from("companies")
-        .select("id, instagram_access_token, instagram_business_id, instagram_page_id")
-        .eq("instagram_enabled", true)
+        .select("id, instagram_access_token, instagram_business_id, instagram_page_id, instagram_bot_enabled")
         .or(`instagram_business_id.eq.${entryId},instagram_page_id.eq.${entryId}`);
 
       const company = companies?.[0];
       if (!company) {
-        console.error("[ig-webhook] no company for entry.id:", entryId);
+        console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "no_company_for_entry", entryId }));
         continue;
       }
 
       const companyId = company.id;
       const accessToken = company.instagram_access_token;
+      const botEnabled = company.instagram_bot_enabled !== false;
 
       // Track last webhook received for UI health indicator
       await supabase
         .from("companies")
         .update({ instagram_last_webhook_at: new Date().toISOString() })
         .eq("id", companyId);
+
 
 
       for (const evt of messagingEvents) {
