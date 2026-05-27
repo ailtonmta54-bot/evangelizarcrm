@@ -258,7 +258,30 @@ export function InstagramSettings() {
               </div>
             </div>
 
+            {(() => {
+              const lastWh = (company as any)?.instagram_last_webhook_at;
+              const lastDate = lastWh ? new Date(lastWh) : null;
+              const minutesAgo = lastDate ? (Date.now() - lastDate.getTime()) / 60000 : null;
+              const healthy = lastDate !== null;
+              return (
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <Label className="text-sm font-medium">Status do webhook</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {lastDate
+                        ? `Última mensagem recebida: ${lastDate.toLocaleString("pt-BR")}`
+                        : "Nenhuma mensagem recebida ainda. Envie um DM de teste para validar."}
+                    </p>
+                  </div>
+                  <Badge variant={healthy ? "default" : "secondary"} className={healthy ? "bg-emerald-500 hover:bg-emerald-500" : ""}>
+                    {healthy ? `Ativo${minutesAgo !== null && minutesAgo < 60 ? ` (${Math.round(minutesAgo)}min)` : ""}` : "Aguardando"}
+                  </Badge>
+                </div>
+              );
+            })()}
+
             <div className="flex items-center justify-between p-3 rounded-lg border">
+
               <div>
                 <Label className="text-sm font-medium">Bot de IA no Instagram Direct</Label>
                 <p className="text-xs text-muted-foreground">Responder mensagens automaticamente com IA</p>
