@@ -26,8 +26,9 @@ export function InstagramSettings() {
       const { data, error } = await supabase
         .from("companies")
         .select(
-          "instagram_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at, instagram_last_webhook_at"
+          "instagram_enabled, instagram_bot_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at, instagram_last_webhook_at"
         )
+
 
         .eq("id", companyId!)
         .single();
@@ -129,14 +130,18 @@ export function InstagramSettings() {
     onError: (err: Error) => toast.error(err.message || "Erro ao desconectar"),
   });
 
-  const toggleEnabledMutation = useMutation({
+  const toggleBotMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const { error } = await supabase.from("companies").update({ instagram_enabled: enabled }).eq("id", companyId!);
+      const { error } = await supabase.from("companies").update({ instagram_bot_enabled: enabled }).eq("id", companyId!);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["instagram-status"] }),
+    onSuccess: (_d, enabled) => {
+      toast.success(enabled ? "Bot do Instagram ativado" : "Bot do Instagram pausado");
+      queryClient.invalidateQueries({ queryKey: ["instagram-status"] });
+    },
     onError: (err: Error) => toast.error(err.message || "Erro"),
   });
+
 
   // Human takeover: disable AI on all IG leads of this company
   const humanTakeoverMutation = useMutation({
@@ -281,16 +286,18 @@ export function InstagramSettings() {
             })()}
 
             <div className="flex items-center justify-between p-3 rounded-lg border">
-
               <div>
                 <Label className="text-sm font-medium">Bot de IA no Instagram Direct</Label>
-                <p className="text-xs text-muted-foreground">Responder mensagens automaticamente com IA</p>
+                <p className="text-xs text-muted-foreground">
+                  {(company as any)?.instagram_bot_enabled !== false ? "Bot ativo — respondendo automaticamente" : "Bot inativo — modo manual"}
+                </p>
               </div>
               <Switch
-                checked={!!company?.instagram_enabled}
-                onCheckedChange={(v) => toggleEnabledMutation.mutate(v)}
+                checked={(company as any)?.instagram_bot_enabled !== false}
+                onCheckedChange={(v) => toggleBotMutation.mutate(v)}
               />
             </div>
+
 
             <div className="flex items-center justify-between p-3 rounded-lg border">
               <div>

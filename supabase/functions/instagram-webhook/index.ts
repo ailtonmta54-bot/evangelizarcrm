@@ -85,21 +85,22 @@ Deno.serve(async (req) => {
       const messagingEvents = entry.messaging || entry.changes || [];
       console.log(`[ig-webhook] entry.id=${entryId} events=${messagingEvents.length}`);
 
-      // Try to find company by either instagram_business_id OR instagram_page_id
+      // Find company by either instagram_business_id OR instagram_page_id
+      // (don't require instagram_enabled — that's used as connection flag; bot toggle is separate)
       const { data: companies } = await supabase
         .from("companies")
-        .select("id, instagram_access_token, instagram_business_id, instagram_page_id")
-        .eq("instagram_enabled", true)
+        .select("id, instagram_access_token, instagram_business_id, instagram_page_id, instagram_bot_enabled")
         .or(`instagram_business_id.eq.${entryId},instagram_page_id.eq.${entryId}`);
 
       const company = companies?.[0];
       if (!company) {
-        console.error("[ig-webhook] no company for entry.id:", entryId);
+        console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "no_company_for_entry", entryId }));
         continue;
       }
 
       const companyId = company.id;
       const accessToken = company.instagram_access_token;
+      const botEnabled = company.instagram_bot_enabled !== false;
 
       // Track last webhook received for UI health indicator
       await supabase
@@ -108,26 +109,26 @@ Deno.serve(async (req) => {
         .eq("id", companyId);
 
 
+
       for (const evt of messagingEvents) {
         // Ignore echoes (messages we sent ourselves)
         if (evt.message?.is_echo) {
-          console.log("[ig-webhook] skip echo");
+          console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "echo", companyId }));
           continue;
         }
 
         const senderId = evt.sender?.id;
         if (!senderId || senderId === company.instagram_business_id || senderId === company.instagram_page_id) {
-          console.log("[ig-webhook] skip self/empty sender");
+          console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "self_or_empty_sender", companyId }));
           continue;
         }
 
         const messageText: string = evt.message?.text || (evt.message?.attachments ? "[mídia]" : "");
         if (!messageText) {
-          console.log("[ig-webhook] skip empty message");
+          console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "empty_message", companyId, senderId }));
           continue;
         }
-        console.log(`[ig-webhook] message from ${senderId}: ${messageText.slice(0, 80)}`);
-
+        console.log(JSON.stringify({ event: "instagram_message_received", companyId, senderId, preview: messageText.slice(0, 80) }));
 
         // Find or create lead by instagram_user_id
         let { data: lead } = await supabase
@@ -138,7 +139,6 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (!lead) {
-          // Try to fetch profile info
           const profile = await fetchIgProfile(accessToken, senderId, company.instagram_business_id);
           const displayName = profile?.name || profile?.username || `IG ${senderId.slice(-6)}`;
           const username = profile?.username || "";
@@ -161,23 +161,22 @@ Deno.serve(async (req) => {
             .single();
 
           if (leadError) {
-            console.error("Error creating IG lead:", leadError);
+            console.error(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "lead_create_failed", error: leadError.message }));
             continue;
           }
           lead = newLead;
-          console.log("New IG lead:", lead.id, displayName);
+          console.log(JSON.stringify({ event: "instagram_lead_created", leadId: lead.id, displayName, companyId }));
         }
 
-        // Save incoming message
+        // Save incoming message (channel = instagram_direct)
         const { error: msgErr } = await supabase.from("messages").insert({
           lead_id: lead.id,
           content: messageText,
           type: "recebida",
           company_id: companyId,
+          channel: "instagram_direct",
         });
         if (msgErr) console.error("[ig-webhook] save message error:", msgErr);
-        else console.log("[ig-webhook] message stored for lead", lead.id);
-
 
         // Auto-tag
         const newTags = autoTagsFor(messageText);
@@ -189,73 +188,93 @@ Deno.serve(async (req) => {
           await supabase.from("leads").update({ updated_at: new Date().toISOString() }).eq("id", lead.id);
         }
 
-        // AI auto-reply
-        if (lead.ai_enabled) {
-          try {
-            // Find best agent: prefer Instagram/both, fallback to any active agent
-            const { data: allAgents } = await supabase
-              .from("agents")
-              .select("*")
-              .eq("company_id", companyId)
-              .eq("active", true);
+        // Bot activation checks
+        console.log(JSON.stringify({ event: "instagram_bot_enabled_checked", companyId, leadId: lead.id, botEnabled, leadAiEnabled: lead.ai_enabled }));
 
-            const igAgents = (allAgents || []).filter((a: any) =>
-              ["instagram", "both"].includes(a.channel)
-            );
-            const pool = igAgents.length > 0 ? igAgents : (allAgents || []);
+        if (!botEnabled) {
+          console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "company_bot_disabled", companyId, leadId: lead.id }));
+          continue;
+        }
+        if (!lead.ai_enabled) {
+          console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "human_takeover", companyId, leadId: lead.id }));
+          continue;
+        }
 
-            const agent =
-              (lead.agent_id && pool.find((a: any) => a.id === lead.agent_id)) ||
-              pool.find((a: any) => a.is_default) ||
-              pool[0];
+        try {
+          // Find best agent: prefer Instagram/both, fallback to any active agent
+          const { data: allAgents } = await supabase
+            .from("agents")
+            .select("*")
+            .eq("company_id", companyId)
+            .eq("active", true);
 
-            if (!agent) {
-              console.log("No active agent for company:", companyId);
-              continue;
-            }
-            console.log(`IG using agent "${agent.name}" (channel=${agent.channel})`);
+          const igAgents = (allAgents || []).filter((a: any) =>
+            ["instagram", "instagram_direct", "both"].includes(a.channel)
+          );
+          const pool = igAgents.length > 0 ? igAgents : (allAgents || []);
 
-            if (!lead.agent_id) {
-              await supabase.from("leads").update({ agent_id: agent.id }).eq("id", lead.id);
-            }
+          const agent =
+            (lead.agent_id && pool.find((a: any) => a.id === lead.agent_id)) ||
+            pool.find((a: any) => a.is_default) ||
+            pool[0];
 
-            const sdrResponse = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/sdr-ai-respond`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  lead_id: lead.id,
-                  company_id: companyId,
-                  agent_id: agent.id,
-                }),
-              }
-            );
-            const sdrResult = await sdrResponse.json();
-
-            if (sdrResult.success && sdrResult.message) {
-              const sendResult = await sendIgMessage(
-                accessToken,
-                company.instagram_business_id,
-                senderId,
-                sdrResult.message
-              );
-              if (sendResult.ok) {
-                await supabase.from("messages").insert({
-                  lead_id: lead.id,
-                  content: sdrResult.message,
-                  type: "enviada",
-                  company_id: companyId,
-                });
-                console.log("IG AI reply sent to:", senderId);
-              }
-            }
-          } catch (aiErr) {
-            console.error("IG AI error:", aiErr);
+          if (!agent) {
+            console.log(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "no_active_agent", companyId, leadId: lead.id }));
+            continue;
           }
+
+          if (!lead.agent_id) {
+            await supabase.from("leads").update({ agent_id: agent.id }).eq("id", lead.id);
+          }
+
+          console.log(JSON.stringify({ event: "instagram_bot_triggered", companyId, leadId: lead.id, agentId: agent.id, agentName: agent.name }));
+
+          const sdrResponse = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/sdr-ai-respond`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                lead_id: lead.id,
+                company_id: companyId,
+                agent_id: agent.id,
+              }),
+            }
+          );
+          const sdrResult = await sdrResponse.json();
+
+          if (!sdrResult.success || !sdrResult.message) {
+            console.error(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "ai_no_response", companyId, leadId: lead.id, sdrResult }));
+            continue;
+          }
+          console.log(JSON.stringify({ event: "instagram_ai_response_generated", leadId: lead.id, preview: sdrResult.message.slice(0, 80) }));
+
+          const sendResult = await sendIgMessage(
+            accessToken,
+            company.instagram_business_id,
+            senderId,
+            sdrResult.message
+          );
+
+          if (sendResult.ok) {
+            await supabase.from("messages").insert({
+              lead_id: lead.id,
+              content: sdrResult.message,
+              type: "enviada",
+              company_id: companyId,
+              channel: "instagram_direct",
+            });
+            console.log(JSON.stringify({ event: "instagram_reply_sent", leadId: lead.id, senderId }));
+          } else {
+            console.error(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "ig_send_failed", leadId: lead.id, result: sendResult.result }));
+          }
+        } catch (aiErr) {
+          console.error(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "exception", error: String(aiErr) }));
+        }
+
         }
       }
     }

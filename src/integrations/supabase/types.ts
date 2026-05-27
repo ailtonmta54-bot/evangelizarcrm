@@ -319,6 +319,7 @@ export type Database = {
           instagram_access_token: string | null
           instagram_app_id: string | null
           instagram_app_secret: string | null
+          instagram_bot_enabled: boolean
           instagram_business_id: string | null
           instagram_connected_at: string | null
           instagram_enabled: boolean
@@ -341,6 +342,7 @@ export type Database = {
           instagram_access_token?: string | null
           instagram_app_id?: string | null
           instagram_app_secret?: string | null
+          instagram_bot_enabled?: boolean
           instagram_business_id?: string | null
           instagram_connected_at?: string | null
           instagram_enabled?: boolean
@@ -363,6 +365,7 @@ export type Database = {
           instagram_access_token?: string | null
           instagram_app_id?: string | null
           instagram_app_secret?: string | null
+          instagram_bot_enabled?: boolean
           instagram_business_id?: string | null
           instagram_connected_at?: string | null
           instagram_enabled?: boolean
@@ -601,6 +604,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          channel: string
           company_id: string
           content: string
           created_at: string
@@ -609,6 +613,7 @@ export type Database = {
           type: Database["public"]["Enums"]["message_type"]
         }
         Insert: {
+          channel?: string
           company_id: string
           content: string
           created_at?: string
@@ -617,6 +622,7 @@ export type Database = {
           type?: Database["public"]["Enums"]["message_type"]
         }
         Update: {
+          channel?: string
           company_id?: string
           content?: string
           created_at?: string
