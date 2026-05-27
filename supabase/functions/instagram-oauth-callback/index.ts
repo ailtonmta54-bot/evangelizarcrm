@@ -179,8 +179,13 @@ Deno.serve(async (req) => {
     console.log("[oauth] IG subscribed_apps result:", JSON.stringify(subIgData));
     if (!subIgRes.ok) console.error("[oauth] IG subscribe FAILED:", subIgData);
 
-    console.log("[oauth] saved company", { companyId, pageId, igBusinessId, username: profData?.username });
+    console.log("[oauth] saving company", { companyId, pageId, igBusinessId, username: profData?.username });
 
+    // 7. Save to company
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    const { error: upErr } = await supabase
+      .from("companies")
+      .update({
         instagram_access_token: pageAccessToken,
         instagram_business_id: igBusinessId,
         instagram_page_id: pageId,
@@ -191,6 +196,7 @@ Deno.serve(async (req) => {
         instagram_enabled: true,
       })
       .eq("id", companyId);
+
 
     if (upErr) {
       console.error("save company error", upErr);
