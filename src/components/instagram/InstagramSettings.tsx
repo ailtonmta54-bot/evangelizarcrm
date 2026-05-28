@@ -23,8 +23,7 @@ export function InstagramSettings() {
   const { data: company, isLoading } = useQuery({
     queryKey: ["instagram-status", companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("companies")
+      const { data, error } = await (supabase.from("companies") as any)
         .select(
           "instagram_enabled, instagram_bot_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at, instagram_last_webhook_at, instagram_bot_debug, instagram_bot_debug_updated_at"
         )
