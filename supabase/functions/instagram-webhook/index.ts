@@ -262,6 +262,7 @@ async function processBotReply({
       .eq("company_id", resolvedTenantId)
       .eq("active", true);
 
+    trace("trigger_search_started", { agents_loaded: allAgents?.length || 0, message_text });
     const instagramAgents = (allAgents || []).filter((agent: any) =>
       ["instagram", "instagram_direct", "both"].includes(agent.channel)
     );
@@ -273,22 +274,19 @@ async function processBotReply({
     debug.active_bot_found = Boolean(agent);
 
     debug.trigger_found = triggerFound;
-    diagnosticLog("active_bot_found", { value: Boolean(agent), agent_id: agent?.id || null });
-    diagnosticLog("trigger_match_result", { value: triggerFound ? "found" : "not_found", agent_id: triggerAgent?.id || null });
+    trace("active_bot_loaded", { value: Boolean(agent), agent_id: agent?.id || null });
+    trace("trigger_found", { value: triggerFound, agent_id: triggerAgent?.id || null, selected_agent_id: agent?.id || null });
 
     if (!agent) {
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("blocked", "no_active_bot_found");
+      trace("openai_not_called", { value: true });
+      return await finish("blocked", "no_active_bot", "active_bot_loaded");
     }
 
     if (!lead?.agent_id) {
       await supabase.from("leads").update({ agent_id: agent.id }).eq("id", lead_id);
     }
 
-    diagnosticLog("openai_called", { value: true });
+    trace("openai_request_started", { lead_id, agent_id: agent.id, company_id: resolvedTenantId });
     debug.openai_called = true;
 
     const sdrResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/sdr-ai-respond`, {
@@ -313,58 +311,63 @@ async function processBotReply({
     }
 
     if (!sdrResponse.ok || sdrResult.error) {
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("failed", "openai_error");
+      trace("openai_response_generated", { value: "", ok: false, response: sdrRaw });
+      return await finish("failed", "openai_not_called", "openai_request_started");
     }
 
     const aiMessage = String(sdrResult.message || "").trim();
-    diagnosticLog("openai_response_generated", { value: Boolean(aiMessage) });
-    diagnosticLog("ai_response_text", { value: aiMessage });
+    trace("openai_response_generated", { value: aiMessage });
     debug.generated_response = aiMessage;
     debug.ai_response_generated = aiMessage;
 
     if (!aiMessage) {
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("failed", "empty_openai_response");
+      return await finish("failed", "openai_response_empty", "openai_response_generated");
     }
 
-    diagnosticLog("instagram_send_api_called", { value: true });
+    if (!sender_id || !/^\d+$/.test(String(sender_id))) {
+      return await finish("failed", "invalid_recipient_id", "instagram_send_request_started");
+    }
+
+    trace("instagram_send_request_started", { recipient_id: sender_id, page_id_present: Boolean(company.instagram_page_id), business_id_present: Boolean(company.instagram_business_id) });
     const sendResult = await sendIgMessage(
       company.instagram_access_token,
       company.instagram_business_id,
+      company.instagram_page_id,
       sender_id,
-      aiMessage
+      aiMessage,
+      trace,
     );
     const sendResponseText = sendResult.responseText || asText(sendResult.result);
-    diagnosticLog("instagram_send_api_response", { value: sendResponseText });
     debug.meta_api_response = sendResponseText;
     debug.meta_send_api_response = sendResponseText;
 
     if (!sendResult.ok) {
-      return await finish("failed", "instagram_send_api_error");
+      const lowerResponse = sendResponseText.toLowerCase();
+      const reason = lowerResponse.includes("cannot parse access token") || lowerResponse.includes("invalid oauth access token")
+        ? "invalid_page_access_token"
+        : "instagram_send_api_failed";
+      return await finish("failed", reason, "instagram_api_response");
     }
 
-    await supabase.from("messages").insert({
+    const { error: replySaveError } = await supabase.from("messages").insert({
       lead_id,
       content: aiMessage,
       type: "enviada",
       company_id: resolvedTenantId,
       channel: "instagram_direct",
     });
-    diagnosticLog("bot_reply_saved", { value: true, lead_id, conversation_id });
+    if (replySaveError) {
+      trace("reply_saved_to_database", { value: false, error: replySaveError.message });
+      return await finish("failed", "database_reply_save_failed", "reply_saved_to_database");
+    }
+    trace("reply_saved_to_database", { value: true, lead_id, conversation_id });
 
-    return await finish("replied");
+    return await finish("success");
   } catch (error) {
-    diagnosticLog("ai_response_text", { value: "" });
-    diagnosticLog("openai_response_generated", { value: false });
-    diagnosticLog("instagram_send_api_called", { value: false });
-    diagnosticLog("instagram_send_api_response", { value: asText(error) });
+    trace("instagram_api_response", { value: asText(error) });
     debug.meta_api_response = asText(error);
     debug.meta_send_api_response = asText(error);
-    return await finish("failed", "openai_error");
+    return await finish("failed", "trigger_logic_error", "bot_processor_exception");
   }
 }
 
