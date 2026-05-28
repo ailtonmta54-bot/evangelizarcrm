@@ -18,27 +18,52 @@ function autoTagsFor(text: string): string[] {
 }
 
 async function sendIgMessage(token: string, businessId: string, recipientId: string, text: string) {
-  const res = await fetch(
+  // Try endpoints in order. Instagram Login (Business Login for Instagram) uses
+  // graph.instagram.com/me/messages. Facebook Page-linked IG uses
+  // graph.facebook.com/me/messages with a Page Access Token. We fall back through
+  // variants to survive different connection types.
+  const endpoints = [
+    `https://graph.instagram.com/v21.0/me/messages`,
+    `https://graph.facebook.com/v21.0/me/messages`,
     `https://graph.facebook.com/v21.0/${businessId}/messages`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        message: { text },
-        messaging_type: "RESPONSE",
-      }),
+  ];
+  const body = JSON.stringify({
+    recipient: { id: recipientId },
+    message: { text },
+    messaging_type: "RESPONSE",
+  });
+
+  let lastResult: any = null;
+  let lastText = "";
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body,
+      });
+      const responseText = await res.text();
+      let result: any = responseText;
+      try { result = responseText ? JSON.parse(responseText) : {}; } catch (_) { result = responseText; }
+      lastResult = result;
+      lastText = responseText || JSON.stringify(result);
+      if (res.ok) {
+        console.log(`IG send ok via ${url}`);
+        return { ok: true, result, responseText: lastText, endpoint: url };
+      }
+      console.error(`IG send failed via ${url}:`, lastText);
+      const errCode = result?.error?.code;
+      const errMsg = String(result?.error?.message || "");
+      const isEndpointIssue =
+        errCode === 3 || errCode === 100 ||
+        /capability|Unsupported|Unknown path|does not exist|nonexisting field/i.test(errMsg);
+      if (!isEndpointIssue) break;
+    } catch (e) {
+      lastText = String(e);
+      console.error(`IG send threw via ${url}:`, lastText);
     }
-  );
-  const responseText = await res.text();
-  let result: any = responseText;
-  try {
-    result = responseText ? JSON.parse(responseText) : {};
-  } catch (_) {
-    result = responseText;
   }
-  if (!res.ok) console.error("IG send error:", result);
-  return { ok: res.ok, result, responseText: responseText || JSON.stringify(result) };
+  return { ok: false, result: lastResult, responseText: lastText };
 }
 
 async function fetchIgProfile(token: string, igsid: string, businessId: string) {

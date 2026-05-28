@@ -82,27 +82,42 @@ Deno.serve(async (req) => {
       );
     }
 
-    const igResponse = await fetch(
+    const endpoints = [
+      `https://graph.instagram.com/v21.0/me/messages`,
+      `https://graph.facebook.com/v21.0/me/messages`,
       `https://graph.facebook.com/v21.0/${company.instagram_business_id}/messages`,
-      {
+    ];
+    const sendBody = JSON.stringify({
+      recipient: { id: lead.instagram_user_id },
+      message: { text: message },
+      messaging_type: "RESPONSE",
+    });
+
+    let igResponse: Response | null = null;
+    let igResult: any = null;
+    for (const url of endpoints) {
+      igResponse = await fetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${company.instagram_access_token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          recipient: { id: lead.instagram_user_id },
-          message: { text: message },
-          messaging_type: "RESPONSE",
-        }),
-      }
-    );
-
-    const igResult = await igResponse.json();
-    if (!igResponse.ok) {
+        body: sendBody,
+      });
+      const txt = await igResponse.text();
+      try { igResult = txt ? JSON.parse(txt) : {}; } catch (_) { igResult = { raw: txt }; }
+      if (igResponse.ok) break;
+      const errCode = igResult?.error?.code;
+      const errMsg = String(igResult?.error?.message || "");
+      const isEndpointIssue =
+        errCode === 3 || errCode === 100 ||
+        /capability|Unsupported|Unknown path|does not exist|nonexisting field/i.test(errMsg);
+      if (!isEndpointIssue) break;
+    }
+    if (!igResponse || !igResponse.ok) {
       console.error("Instagram API error:", igResult);
       return new Response(JSON.stringify({ error: igResult?.error?.message || "Erro ao enviar" }), {
-        status: igResponse.status,
+        status: igResponse?.status || 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
