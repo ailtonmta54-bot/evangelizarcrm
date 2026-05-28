@@ -219,6 +219,10 @@ async function processBotReply({
     sender_id: sender_id || "",
     channel,
     bot_processor_called: true,
+    trace_steps: [
+      { step: "instagram_webhook_received", at: new Date().toISOString(), tenant_id: resolvedTenantId || "", channel },
+      { step: "instagram_message_saved", at: new Date().toISOString(), tenant_id: resolvedTenantId || "", lead_id: lead_id || "", conversation_id: conversation_id || "", message_id: message_id || "" },
+    ],
     active_bot_found: null,
     instagram_channel_enabled: null,
     bot_enabled: null,
