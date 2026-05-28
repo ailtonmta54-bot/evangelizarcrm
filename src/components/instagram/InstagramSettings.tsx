@@ -160,6 +160,12 @@ export function InstagramSettings() {
   const isConnecting = connectMutation.isPending;
   const debug = ((company as any)?.instagram_bot_debug || {}) as Record<string, any>;
   const debugRows = [
+    ["last_incoming_instagram_message", debug.message_text || debug.last_received_direct_message],
+    ["last_openai_response", debug.generated_response || debug.ai_response_generated],
+    ["last_send_api_payload", debug.instagram_api_endpoint_called ? JSON.stringify(debug.instagram_api_endpoint_called) : ""],
+    ["last_meta_api_response", debug.instagram_api_response || debug.meta_api_response || debug.meta_send_api_response],
+    ["exact_blocked_step", debug.exact_blocked_step],
+    ["exact_failure_reason", debug.failure_reason || debug.blocked_reason],
     ["lead_id", debug.lead_id],
     ["conversation_id", debug.conversation_id],
     ["message_text", debug.message_text || debug.last_received_direct_message],
@@ -170,6 +176,7 @@ export function InstagramSettings() {
     ["trigger_found", typeof debug.trigger_found === "boolean" ? (debug.trigger_found ? "true" : "false") : "—"],
     ["openai_called", debug.openai_called ? "true" : "false"],
     ["generated_response", debug.generated_response || debug.ai_response_generated],
+    ["instagram_api_endpoint_called", debug.instagram_api_endpoint_called ? JSON.stringify(debug.instagram_api_endpoint_called) : ""],
     ["meta_api_response", debug.meta_api_response || debug.meta_send_api_response],
     ["blocked_reason", debug.blocked_reason],
     ["final_status", debug.final_status],
