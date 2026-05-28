@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Instagram, CheckCircle2, AlertTriangle, Loader2, LogIn, LogOut, HandMetal } from "lucide-react";
+import { Instagram, CheckCircle2, AlertTriangle, Loader2, LogIn, LogOut, HandMetal, Bug } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +26,7 @@ export function InstagramSettings() {
       const { data, error } = await supabase
         .from("companies")
         .select(
-          "instagram_enabled, instagram_bot_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at, instagram_last_webhook_at"
+          "instagram_enabled, instagram_bot_enabled, instagram_username, instagram_profile_pic_url, instagram_connected_at, instagram_token_expires_at, instagram_last_webhook_at, instagram_bot_debug, instagram_bot_debug_updated_at"
         )
 
 
