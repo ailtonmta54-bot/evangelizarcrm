@@ -315,7 +315,16 @@ async function processBotReply({
       trace("page_access_token_loaded", { value: false });
       return await finish("blocked", "page_access_token_missing", "page_access_token_loaded");
     }
-    trace("page_access_token_loaded", { value: true, token_length: String(company.instagram_access_token).length, page_id_present: Boolean(company.instagram_page_id) });
+    const storedTokenInfo = await inspectMetaToken(company.instagram_access_token);
+    debug.meta_token_debug = storedTokenInfo;
+    trace("page_access_token_loaded", {
+      value: true,
+      token_length: String(company.instagram_access_token).length,
+      page_id_present: Boolean(company.instagram_page_id),
+      token_valid: storedTokenInfo?.is_valid ?? null,
+      token_type: storedTokenInfo?.type || "unknown",
+      token_scopes: storedTokenInfo?.scopes || [],
+    });
 
     const { data: allAgents } = await supabase
       .from("agents")
@@ -389,11 +398,30 @@ async function processBotReply({
       return await finish("failed", "invalid_recipient_id", "instagram_send_request_started");
     }
 
-    trace("instagram_send_request_started", { recipient_id: sender_id, page_id_present: Boolean(company.instagram_page_id), business_id_present: Boolean(company.instagram_business_id) });
-    const sendResult = await sendIgMessage(
+    const resolvedSendAuth = await resolvePageAccessToken(
       company.instagram_access_token,
+      company.instagram_page_id || "",
+      company.instagram_business_id || "",
+      trace,
+    );
+    debug.send_token_source = resolvedSendAuth.source;
+    debug.send_page_id = resolvedSendAuth.pageId || "";
+    const sendTokenInfo = await inspectMetaToken(resolvedSendAuth.token);
+    debug.send_token_debug = sendTokenInfo;
+
+    trace("instagram_send_request_started", {
+      recipient_id: sender_id,
+      page_id_present: Boolean(resolvedSendAuth.pageId),
+      business_id_present: Boolean(company.instagram_business_id),
+      token_source: resolvedSendAuth.source,
+      token_valid: sendTokenInfo?.is_valid ?? null,
+      token_type: sendTokenInfo?.type || "unknown",
+      token_scopes: sendTokenInfo?.scopes || [],
+    });
+    const sendResult = await sendIgMessage(
+      resolvedSendAuth.token,
       company.instagram_business_id,
-      company.instagram_page_id,
+      resolvedSendAuth.pageId,
       sender_id,
       aiMessage,
       trace,
