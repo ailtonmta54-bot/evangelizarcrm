@@ -275,7 +275,6 @@ Deno.serve(async (req) => {
           console.error(JSON.stringify({ event: "instagram_bot_blocked_reason", reason: "exception", error: String(aiErr) }));
         }
 
-        }
       }
     }
 
