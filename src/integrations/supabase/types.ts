@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_credentials: {
+        Row: {
+          agent_id: string
+          company_id: string
+          created_at: string
+          updated_at: string
+          whatsapp_token: string
+          whatsapp_verify_token: string
+          zapi_instance_id: string
+          zapi_token: string
+        }
+        Insert: {
+          agent_id: string
+          company_id: string
+          created_at?: string
+          updated_at?: string
+          whatsapp_token?: string
+          whatsapp_verify_token?: string
+          zapi_instance_id?: string
+          zapi_token?: string
+        }
+        Update: {
+          agent_id?: string
+          company_id?: string
+          created_at?: string
+          updated_at?: string
+          whatsapp_token?: string
+          whatsapp_verify_token?: string
+          zapi_instance_id?: string
+          zapi_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_credentials_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_products: {
         Row: {
           agent_id: string
@@ -856,8 +897,13 @@ export type Database = {
       get_agent_secrets: {
         Args: { _agent_id: string }
         Returns: {
+          has_whatsapp_token: boolean
+          has_whatsapp_verify_token: boolean
+          has_zapi_instance_id: boolean
+          has_zapi_token: boolean
           whatsapp_token: string
           whatsapp_verify_token: string
+          zapi_instance_id: string
           zapi_token: string
         }[]
       }
@@ -886,6 +932,19 @@ export type Database = {
       is_company_whatsapp_configured: { Args: never; Returns: boolean }
       is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      mask_secret: { Args: { _value: string }; Returns: string }
+      save_agent_secret: {
+        Args: { _agent_id: string; _field: string; _value: string }
+        Returns: boolean
+      }
+      set_user_role: {
+        Args: {
+          _grant?: boolean
+          _role: Database["public"]["Enums"]["app_role"]
+          _target_user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       agent_type:

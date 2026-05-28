@@ -160,18 +160,19 @@ export function InstagramSettings() {
   const isConnecting = connectMutation.isPending;
   const debug = ((company as any)?.instagram_bot_debug || {}) as Record<string, any>;
   const debugRows = [
-    ["Last received Direct message", debug.last_received_direct_message],
-    ["Tenant ID", debug.tenant_id],
-    ["Conversation ID", debug.conversation_id],
-    ["Sender ID", debug.sender_id],
-    ["Bot enabled?", typeof debug.bot_enabled === "boolean" ? (debug.bot_enabled ? "Sim" : "Não") : "—"],
-    ["Human takeover?", typeof debug.human_takeover === "boolean" ? (debug.human_takeover ? "Sim" : "Não") : "—"],
-    ["Trigger found?", typeof debug.trigger_found === "boolean" ? (debug.trigger_found ? "Sim" : "Não") : "—"],
-    ["OpenAI called?", debug.openai_called ? "Sim" : "Não"],
-    ["AI response generated?", debug.ai_response_generated],
-    ["Meta send API response", debug.meta_send_api_response],
-    ["Blocked reason", debug.blocked_reason],
-    ["Final status", debug.final_status],
+    ["lead_id", debug.lead_id],
+    ["conversation_id", debug.conversation_id],
+    ["message_text", debug.message_text || debug.last_received_direct_message],
+    ["bot_processor_called", typeof debug.bot_processor_called === "boolean" ? (debug.bot_processor_called ? "true" : "false") : "—"],
+    ["active_bot_found", typeof debug.active_bot_found === "boolean" ? (debug.active_bot_found ? "true" : "false") : "—"],
+    ["instagram_channel_enabled", typeof debug.instagram_channel_enabled === "boolean" ? (debug.instagram_channel_enabled ? "true" : "false") : "—"],
+    ["human_takeover", typeof debug.human_takeover === "boolean" ? (debug.human_takeover ? "true" : "false") : "—"],
+    ["trigger_found", typeof debug.trigger_found === "boolean" ? (debug.trigger_found ? "true" : "false") : "—"],
+    ["openai_called", debug.openai_called ? "true" : "false"],
+    ["generated_response", debug.generated_response || debug.ai_response_generated],
+    ["meta_api_response", debug.meta_api_response || debug.meta_send_api_response],
+    ["blocked_reason", debug.blocked_reason],
+    ["final_status", debug.final_status],
   ];
 
   return (

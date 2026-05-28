@@ -39,6 +39,8 @@ import { InstagramSettings } from "@/components/instagram/InstagramSettings";
 
 const MAX_AGENTS_PER_WORKSPACE = 5;
 
+const AGENT_SAFE_SELECT = "id, company_id, name, description, agent_type, prompt, tone, goal, temperature, active, is_default, knowledge, created_at, updated_at, whatsapp_phone_id, workspace_id, channel, whatsapp_provider, zapi_enabled, status, avatar_url, ignore_video_calls, ignore_voice_calls, ignore_groups, recognize_audio, google_calendar_enabled, google_calendar_link, google_calendar_id, elevenlabs_voice_id, elevenlabs_enabled, away_message, schedule_days, schedule_end, schedule_start, schedule_enabled, keywords";
+
 const avatarOptions = [
   { src: avatarAtendimentoF, label: "Atendente" },
   { src: avatarVendasM, label: "Vendedor" },
@@ -124,7 +126,7 @@ export default function Robos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agents")
-        .select("*")
+        .select(AGENT_SAFE_SELECT)
         .eq("workspace_id", activeWorkspaceId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -191,10 +193,10 @@ export default function Robos() {
   const { data: agentSecrets } = useQuery({
     queryKey: ["agent-secrets", selectedAgentId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_agent_secrets", { _agent_id: selectedAgentId! });
+      const { data, error } = await (supabase as any).rpc("get_agent_secrets", { _agent_id: selectedAgentId! });
       if (error) throw error;
-      return (data?.[0] ?? { whatsapp_token: "", whatsapp_verify_token: "", zapi_token: "" }) as {
-        whatsapp_token: string; whatsapp_verify_token: string; zapi_token: string;
+      return (data?.[0] ?? { whatsapp_token: "", whatsapp_verify_token: "", zapi_token: "", zapi_instance_id: "" }) as {
+        whatsapp_token: string; whatsapp_verify_token: string; zapi_token: string; zapi_instance_id: string;
       };
     },
     enabled: !!selectedAgentId,
@@ -242,6 +244,20 @@ export default function Robos() {
       queryClient.invalidateQueries({ queryKey: ["agents"] });
     },
     onError: () => toast.error("Erro ao salvar"),
+  });
+
+  const saveSecretMutation = useMutation({
+    mutationFn: async ({ field, value }: { field: string; value: any }) => {
+      if (!currentAgent) return;
+      const { error } = await (supabase as any).rpc("save_agent_secret", {
+        _agent_id: currentAgent.id,
+        _field: field,
+        _value: String(value ?? ""),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agent-secrets", selectedAgentId] }),
+    onError: () => toast.error("Erro ao salvar credencial"),
   });
 
   const deleteMutation = useMutation({
@@ -306,6 +322,10 @@ export default function Robos() {
 
   // Save field with debounced auto-save on blur
   const saveField = (field: string, value: any) => {
+    if (["whatsapp_token", "whatsapp_verify_token", "zapi_token", "zapi_instance_id"].includes(field)) {
+      saveSecretMutation.mutate({ field, value });
+      return;
+    }
     updateField.mutate({ [field]: value });
   };
 
@@ -887,7 +907,7 @@ export default function Robos() {
                     <Input
                       type="password"
                       defaultValue={agentSecrets?.whatsapp_token || ""}
-                      onBlur={(e) => saveField("whatsapp_token", e.target.value)}
+                      onBlur={(e) => !e.target.value.startsWith("••••••") && saveField("whatsapp_token", e.target.value)}
                       placeholder="Token da API Meta"
                     />
                   </div>
@@ -903,7 +923,7 @@ export default function Robos() {
                     <Label className="text-xs">Verify Token</Label>
                     <Input
                       defaultValue={agentSecrets?.whatsapp_verify_token || ""}
-                      onBlur={(e) => saveField("whatsapp_verify_token", e.target.value)}
+                      onBlur={(e) => !e.target.value.startsWith("••••••") && saveField("whatsapp_verify_token", e.target.value)}
                       placeholder="Token de verificação"
                     />
                   </div>
@@ -945,8 +965,8 @@ export default function Robos() {
                   <div className="space-y-2">
                     <Label className="text-xs">Instance ID</Label>
                     <Input
-                      defaultValue={(currentAgent as any).zapi_instance_id || ""}
-                      onBlur={(e) => saveField("zapi_instance_id" as any, e.target.value)}
+                      defaultValue={agentSecrets?.zapi_instance_id || ""}
+                      onBlur={(e) => !e.target.value.startsWith("••••••") && saveField("zapi_instance_id" as any, e.target.value)}
                       placeholder="ID da instância Z-API"
                     />
                   </div>
@@ -955,7 +975,7 @@ export default function Robos() {
                     <Input
                       type="password"
                       defaultValue={agentSecrets?.zapi_token || ""}
-                      onBlur={(e) => saveField("zapi_token" as any, e.target.value)}
+                      onBlur={(e) => !e.target.value.startsWith("••••••") && saveField("zapi_token" as any, e.target.value)}
                       placeholder="Token da instância"
                     />
                   </div>
