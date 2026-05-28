@@ -23,10 +23,10 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
   // graph.facebook.com/me/messages with a Page Access Token. We fall back through
   // variants to survive different connection types.
   const endpoints = [
-    `https://graph.facebook.com/v21.0/me/messages`,
-    `https://graph.facebook.com/v21.0/${businessId}/messages`,
     `https://graph.instagram.com/v21.0/me/messages`,
     `https://graph.instagram.com/v21.0/${businessId}/messages`,
+    `https://graph.facebook.com/v21.0/me/messages`,
+    `https://graph.facebook.com/v21.0/${businessId}/messages`,
   ];
   const body = JSON.stringify({
     recipient: { id: recipientId },
@@ -57,7 +57,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
       const errMsg = String(result?.error?.message || "");
       const isEndpointIssue =
         errCode === 3 || errCode === 100 || (errCode === 190 && url.includes("graph.instagram.com")) ||
-        /capability|Unsupported|Unknown path|does not exist|nonexisting field/i.test(errMsg);
+        /capability|Unsupported|Unknown path|does not exist|nonexisting field|pages_.*permission|before impersonating/i.test(errMsg);
       if (!isEndpointIssue) break;
     } catch (e) {
       lastText = String(e);
