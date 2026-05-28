@@ -23,9 +23,10 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
   // graph.facebook.com/me/messages with a Page Access Token. We fall back through
   // variants to survive different connection types.
   const endpoints = [
-    `https://graph.instagram.com/v21.0/me/messages`,
     `https://graph.facebook.com/v21.0/me/messages`,
     `https://graph.facebook.com/v21.0/${businessId}/messages`,
+    `https://graph.instagram.com/v21.0/me/messages`,
+    `https://graph.instagram.com/v21.0/${businessId}/messages`,
   ];
   const body = JSON.stringify({
     recipient: { id: recipientId },
@@ -55,7 +56,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
       const errCode = result?.error?.code;
       const errMsg = String(result?.error?.message || "");
       const isEndpointIssue =
-        errCode === 3 || errCode === 100 ||
+        errCode === 3 || errCode === 100 || (errCode === 190 && url.includes("graph.instagram.com")) ||
         /capability|Unsupported|Unknown path|does not exist|nonexisting field/i.test(errMsg);
       if (!isEndpointIssue) break;
     } catch (e) {
@@ -113,8 +114,9 @@ function diagnosticLog(event: string, payload: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ event, ...payload }));
 }
 
-async function processIncomingMessageBotReply({
+async function processBotReply({
   tenant_id,
+  company_id,
   channel,
   lead_id,
   conversation_id,
@@ -123,6 +125,7 @@ async function processIncomingMessageBotReply({
   message_text,
 }: {
   tenant_id?: string;
+  company_id?: string;
   channel: "instagram_direct";
   lead_id?: string;
   conversation_id?: string;
@@ -130,62 +133,71 @@ async function processIncomingMessageBotReply({
   sender_id?: string;
   message_text?: string;
 }) {
+  const resolvedTenantId = tenant_id || company_id;
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
   const debug: Record<string, unknown> = {
+    message_text: message_text || "",
     last_received_direct_message: message_text || "",
-    tenant_id: tenant_id || "",
+    tenant_id: resolvedTenantId || "",
+    company_id: company_id || resolvedTenantId || "",
     conversation_id: conversation_id || "",
     lead_id: lead_id || "",
     message_id: message_id || "",
     sender_id: sender_id || "",
     channel,
+    bot_processor_called: true,
+    active_bot_found: null,
+    instagram_channel_enabled: null,
     bot_enabled: null,
     human_takeover: null,
     trigger_found: null,
     openai_called: false,
+    generated_response: "",
     ai_response_generated: "",
+    meta_api_response: "",
     meta_send_api_response: "",
     blocked_reason: "",
     final_status: "blocked",
     updated_at: new Date().toISOString(),
   };
 
-  diagnosticLog("bot_processor_called", { tenant_id, channel, lead_id, conversation_id, message_id, sender_id });
+  diagnosticLog("bot_processor_called", { tenant_id: resolvedTenantId, company_id: company_id || resolvedTenantId, channel, lead_id, conversation_id, message_id, sender_id });
 
   const finish = async (finalStatus: "replied" | "blocked" | "failed", blockedReason = "") => {
     debug.final_status = finalStatus;
     debug.blocked_reason = blockedReason;
     debug.updated_at = new Date().toISOString();
     diagnosticLog("final_status", { value: finalStatus, blocked_reason: blockedReason || null });
-    await saveInstagramBotDebug(supabase, tenant_id, debug);
+    await saveInstagramBotDebug(supabase, resolvedTenantId, debug);
     return { finalStatus, blockedReason };
   };
 
-  if (!tenant_id) return await finish("blocked", "missing_tenant_id");
+  if (channel !== "instagram_direct") return await finish("blocked", "instagram_direct_channel_disabled");
+  if (!resolvedTenantId) return await finish("blocked", "missing_tenant_id");
   if (!conversation_id) return await finish("blocked", "missing_conversation_id");
   if (!sender_id) return await finish("blocked", "missing_sender_id");
-  if (!message_text) return await finish("blocked", "missing_message_text");
+  if (!message_text) return await finish("blocked", "empty_message_text");
 
   try {
     const { data: company } = await supabase
       .from("companies")
       .select("id, instagram_access_token, instagram_business_id, instagram_bot_enabled")
-      .eq("id", tenant_id)
+      .eq("id", resolvedTenantId)
       .maybeSingle();
 
     const { data: lead } = await supabase
       .from("leads")
       .select("id, ai_enabled, agent_id")
       .eq("id", lead_id)
-      .eq("company_id", tenant_id)
+      .eq("company_id", resolvedTenantId)
       .maybeSingle();
 
     diagnosticLog("bot_settings_loaded", {
-      tenant_id,
+      tenant_id: resolvedTenantId,
       lead_id,
       has_company: Boolean(company),
       has_lead: Boolean(lead),
@@ -194,24 +206,27 @@ async function processIncomingMessageBotReply({
     const botEnabledForInstagramDirect = company?.instagram_bot_enabled !== false;
     const humanTakeover = lead?.ai_enabled === false;
     debug.bot_enabled = botEnabledForInstagramDirect;
+    debug.instagram_channel_enabled = botEnabledForInstagramDirect;
     debug.human_takeover = humanTakeover;
 
-    diagnosticLog("bot_enabled_for_instagram_direct", { value: botEnabledForInstagramDirect });
-    diagnosticLog("human_takeover", { value: humanTakeover });
+    diagnosticLog("instagram_channel_enabled", { value: botEnabledForInstagramDirect });
+    diagnosticLog("human_takeover_status", { value: humanTakeover });
 
     if (!botEnabledForInstagramDirect) {
-      diagnosticLog("trigger_match", { value: "not_found" });
+      diagnosticLog("trigger_match_result", { value: "not_found" });
       diagnosticLog("openai_called", { value: false });
+      diagnosticLog("openai_response_generated", { value: false });
       diagnosticLog("ai_response_text", { value: "" });
       diagnosticLog("instagram_send_api_called", { value: false });
       diagnosticLog("instagram_send_api_response", { value: "" });
       debug.trigger_found = false;
-      return await finish("blocked", "bot_disabled_for_instagram_direct");
+      return await finish("blocked", "instagram_direct_channel_disabled");
     }
 
     if (humanTakeover) {
-      diagnosticLog("trigger_match", { value: "not_found" });
+      diagnosticLog("trigger_match_result", { value: "not_found" });
       diagnosticLog("openai_called", { value: false });
+      diagnosticLog("openai_response_generated", { value: false });
       diagnosticLog("ai_response_text", { value: "" });
       diagnosticLog("instagram_send_api_called", { value: false });
       diagnosticLog("instagram_send_api_response", { value: "" });
@@ -220,19 +235,22 @@ async function processIncomingMessageBotReply({
     }
 
     if (!company?.instagram_access_token) {
-      diagnosticLog("trigger_match", { value: "not_found" });
+      diagnosticLog("trigger_match_result", { value: "not_found" });
       diagnosticLog("openai_called", { value: false });
+      diagnosticLog("openai_response_generated", { value: false });
       diagnosticLog("ai_response_text", { value: "" });
       diagnosticLog("instagram_send_api_called", { value: false });
       diagnosticLog("instagram_send_api_response", { value: "" });
       debug.trigger_found = false;
+      diagnosticLog("page_access_token_found", { value: false });
       return await finish("blocked", "missing_page_access_token");
     }
+    diagnosticLog("page_access_token_found", { value: true });
 
     const { data: allAgents } = await supabase
       .from("agents")
       .select("*")
-      .eq("company_id", tenant_id)
+      .eq("company_id", resolvedTenantId)
       .eq("active", true);
 
     const instagramAgents = (allAgents || []).filter((agent: any) =>
@@ -243,16 +261,18 @@ async function processIncomingMessageBotReply({
     const triggerAgent = pool.find((agent: any) => matchesKeywords(agent, message_text));
     const triggerFound = Boolean(triggerAgent);
     const agent = assignedAgent || triggerAgent || pool.find((agent: any) => agent.is_default) || pool[0];
+    debug.active_bot_found = Boolean(agent);
 
     debug.trigger_found = triggerFound;
-    diagnosticLog("trigger_match", { value: triggerFound ? "found" : "not_found", agent_id: triggerAgent?.id || null });
+    diagnosticLog("active_bot_found", { value: Boolean(agent), agent_id: agent?.id || null });
+    diagnosticLog("trigger_match_result", { value: triggerFound ? "found" : "not_found", agent_id: triggerAgent?.id || null });
 
     if (!agent) {
       diagnosticLog("openai_called", { value: false });
       diagnosticLog("ai_response_text", { value: "" });
       diagnosticLog("instagram_send_api_called", { value: false });
       diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("failed", "openai_error");
+      return await finish("blocked", "no_active_bot_found");
     }
 
     if (!lead?.agent_id) {
@@ -270,7 +290,7 @@ async function processIncomingMessageBotReply({
       },
       body: JSON.stringify({
         lead_id,
-        company_id: tenant_id,
+        company_id: resolvedTenantId,
         agent_id: agent.id,
       }),
     });
@@ -291,13 +311,15 @@ async function processIncomingMessageBotReply({
     }
 
     const aiMessage = String(sdrResult.message || "").trim();
+    diagnosticLog("openai_response_generated", { value: Boolean(aiMessage) });
     diagnosticLog("ai_response_text", { value: aiMessage });
+    debug.generated_response = aiMessage;
     debug.ai_response_generated = aiMessage;
 
     if (!aiMessage) {
       diagnosticLog("instagram_send_api_called", { value: false });
       diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("failed", "empty_ai_response");
+      return await finish("failed", "empty_openai_response");
     }
 
     diagnosticLog("instagram_send_api_called", { value: true });
@@ -309,25 +331,29 @@ async function processIncomingMessageBotReply({
     );
     const sendResponseText = sendResult.responseText || asText(sendResult.result);
     diagnosticLog("instagram_send_api_response", { value: sendResponseText });
+    debug.meta_api_response = sendResponseText;
     debug.meta_send_api_response = sendResponseText;
 
     if (!sendResult.ok) {
-      return await finish("failed", "meta_send_api_error");
+      return await finish("failed", "instagram_send_api_error");
     }
 
     await supabase.from("messages").insert({
       lead_id,
       content: aiMessage,
       type: "enviada",
-      company_id: tenant_id,
+      company_id: resolvedTenantId,
       channel: "instagram_direct",
     });
+    diagnosticLog("bot_reply_saved", { value: true, lead_id, conversation_id });
 
     return await finish("replied");
   } catch (error) {
     diagnosticLog("ai_response_text", { value: "" });
+    diagnosticLog("openai_response_generated", { value: false });
     diagnosticLog("instagram_send_api_called", { value: false });
     diagnosticLog("instagram_send_api_response", { value: asText(error) });
+    debug.meta_api_response = asText(error);
     debug.meta_send_api_response = asText(error);
     return await finish("failed", "openai_error");
   }
@@ -411,11 +437,11 @@ Deno.serve(async (req) => {
             openai_called: false,
             ai_response_generated: "",
             meta_send_api_response: "",
-            blocked_reason: "message_detected_as_echo",
+            blocked_reason: "message_is_echo",
             final_status: "blocked",
             updated_at: new Date().toISOString(),
           });
-          diagnosticLog("final_status", { value: "blocked", blocked_reason: "message_detected_as_echo" });
+          diagnosticLog("final_status", { value: "blocked", blocked_reason: "message_is_echo" });
           continue;
         }
 
@@ -469,6 +495,7 @@ Deno.serve(async (req) => {
           lead = newLead;
           console.log(JSON.stringify({ event: "instagram_lead_created", leadId: lead.id, displayName, companyId }));
         }
+        diagnosticLog("lead_created_or_updated", { tenant_id: companyId, lead_id: lead.id, sender_id: senderId });
 
         // Save incoming message (channel = instagram_direct)
         const { data: savedMessage, error: msgErr } = await supabase.from("messages").insert({
@@ -493,14 +520,15 @@ Deno.serve(async (req) => {
         });
 
         try {
-          await processIncomingMessageBotReply({
-          tenant_id: companyId,
-          channel: "instagram_direct",
-          lead_id: lead.id,
-          conversation_id: lead.id,
-          message_id: messageId,
-          sender_id: senderId,
-          message_text: messageText,
+          await processBotReply({
+            tenant_id: companyId,
+            company_id: companyId,
+            channel: "instagram_direct",
+            lead_id: lead.id,
+            conversation_id: lead.id,
+            message_id: messageId,
+            sender_id: senderId,
+            message_text: messageText,
           });
         } catch (processorError) {
           diagnosticLog("bot_processor_called", { tenant_id: companyId, lead_id: lead.id, error: asText(processorError) });
