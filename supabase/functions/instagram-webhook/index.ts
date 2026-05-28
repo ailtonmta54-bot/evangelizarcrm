@@ -30,6 +30,7 @@ async function sendIgMessage(
   // not the Instagram Business Account id. The graph.instagram.com variants are
   // kept only as fallback for Business Login token shapes.
   const endpoints = [
+    pageId ? `https://graph.facebook.com/v23.0/${pageId}/messages` : "",
     pageId ? `https://graph.facebook.com/v21.0/${pageId}/messages` : "",
     `https://graph.facebook.com/v21.0/me/messages`,
     `https://graph.instagram.com/v21.0/me/messages`,
