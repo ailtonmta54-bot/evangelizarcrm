@@ -158,6 +158,21 @@ export function InstagramSettings() {
   });
 
   const isConnecting = connectMutation.isPending;
+  const debug = ((company as any)?.instagram_bot_debug || {}) as Record<string, any>;
+  const debugRows = [
+    ["Last received Direct message", debug.last_received_direct_message],
+    ["Tenant ID", debug.tenant_id],
+    ["Conversation ID", debug.conversation_id],
+    ["Sender ID", debug.sender_id],
+    ["Bot enabled?", typeof debug.bot_enabled === "boolean" ? (debug.bot_enabled ? "Sim" : "Não") : "—"],
+    ["Human takeover?", typeof debug.human_takeover === "boolean" ? (debug.human_takeover ? "Sim" : "Não") : "—"],
+    ["Trigger found?", typeof debug.trigger_found === "boolean" ? (debug.trigger_found ? "Sim" : "Não") : "—"],
+    ["OpenAI called?", debug.openai_called ? "Sim" : "Não"],
+    ["AI response generated?", debug.ai_response_generated],
+    ["Meta send API response", debug.meta_send_api_response],
+    ["Blocked reason", debug.blocked_reason],
+    ["Final status", debug.final_status],
+  ];
 
   return (
     <Card>
@@ -316,6 +331,31 @@ export function InstagramSettings() {
                 <HandMetal className="h-4 w-4" /> Assumir conversas
               </Button>
             </div>
+
+            <Card className="border-dashed">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Bug className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <CardTitle className="text-sm">Instagram Bot Debug</CardTitle>
+                    <CardDescription className="text-xs">
+                      Último diagnóstico do bot no Instagram Direct
+                      {(company as any)?.instagram_bot_debug_updated_at
+                        ? ` · ${new Date((company as any).instagram_bot_debug_updated_at).toLocaleString("pt-BR")}`
+                        : ""}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {debugRows.map(([label, value]) => (
+                  <div key={label} className="grid gap-1 rounded-md border bg-muted/20 p-2 sm:grid-cols-[190px_1fr]">
+                    <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                    <span className="break-words text-xs font-mono">{value ? String(value) : "—"}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </>
         )}
       </CardContent>
