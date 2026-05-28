@@ -11,6 +11,7 @@ const SCOPES = [
   "pages_messaging",
   "pages_show_list",
   "pages_manage_metadata",
+  "pages_read_engagement",
   "business_management",
 ].join(",");
 
