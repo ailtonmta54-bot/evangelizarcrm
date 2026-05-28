@@ -360,7 +360,6 @@ Deno.serve(async (req) => {
       }
 
       const companyId = company.id;
-      const accessToken = company.instagram_access_token;
 
       // Track last webhook received for UI health indicator
       await supabase
