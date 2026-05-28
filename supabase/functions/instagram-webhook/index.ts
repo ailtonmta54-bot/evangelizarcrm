@@ -109,6 +109,65 @@ function asText(value: unknown): string {
   }
 }
 
+async function inspectMetaToken(token: string) {
+  const appId = Deno.env.get("META_APP_ID");
+  const appSecret = Deno.env.get("META_APP_SECRET");
+  if (!appId || !appSecret || !token) return null;
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
+    );
+    const raw = await res.text();
+    const json = raw ? JSON.parse(raw) : {};
+    const data = json?.data || {};
+    return {
+      ok: res.ok,
+      is_valid: data.is_valid,
+      type: data.type,
+      expires_at: data.expires_at,
+      scopes: data.scopes || [],
+      granular_scopes: data.granular_scopes || [],
+      error: json?.error?.message || "",
+    };
+  } catch (error) {
+    return { ok: false, error: asText(error), scopes: [] };
+  }
+}
+
+async function resolvePageAccessToken(
+  storedToken: string,
+  pageId: string,
+  businessId: string,
+  trace: (event: string, payload?: Record<string, unknown>) => void,
+) {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${encodeURIComponent(storedToken)}`
+    );
+    const raw = await res.text();
+    let json: any = {};
+    try { json = raw ? JSON.parse(raw) : {}; } catch (_) { json = { raw }; }
+    const pages = Array.isArray(json?.data) ? json.data : [];
+    const matched = pages.find((page: any) =>
+      (pageId && page.id === pageId) || (businessId && page.instagram_business_account?.id === businessId)
+    );
+    trace("page_access_token_resolution_response", {
+      ok: res.ok,
+      status: res.status,
+      pages_found: pages.length,
+      matched_page_id: matched?.id || "",
+      matched_business_id: matched?.instagram_business_account?.id || "",
+      error: json?.error?.message || "",
+    });
+    if (matched?.access_token) {
+      return { token: matched.access_token as string, pageId: matched.id as string, source: "resolved_from_user_token" };
+    }
+  } catch (error) {
+    trace("page_access_token_resolution_response", { ok: false, error: asText(error) });
+  }
+  return { token: storedToken, pageId, source: "stored_token" };
+}
+
 async function saveInstagramBotDebug(supabase: any, tenantId: string | undefined, debug: Record<string, unknown>) {
   if (!tenantId) return;
   await supabase
