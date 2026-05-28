@@ -166,6 +166,8 @@ async function processBotReply({
     human_takeover: null,
     trigger_found: null,
     openai_called: false,
+    exact_blocked_step: "",
+    failure_reason: "",
     generated_response: "",
     ai_response_generated: "",
     meta_api_response: "",
@@ -175,27 +177,36 @@ async function processBotReply({
     updated_at: new Date().toISOString(),
   };
 
-  diagnosticLog("bot_processor_called", { tenant_id: resolvedTenantId, company_id: company_id || resolvedTenantId, channel, lead_id, conversation_id, message_id, sender_id });
+  const trace = (event: string, payload: Record<string, unknown> = {}) => {
+    diagnosticLog(event, payload);
+    if (event === "instagram_api_endpoint_called") debug.instagram_api_endpoint_called = payload;
+    if (event === "instagram_api_response") debug.instagram_api_response = payload.response || asText(payload);
+  };
 
-  const finish = async (finalStatus: "replied" | "blocked" | "failed", blockedReason = "") => {
+  trace("bot_trigger_attempt_started", { tenant_id: resolvedTenantId, company_id: company_id || resolvedTenantId, channel, lead_id, conversation_id, message_id, sender_id });
+  trace("channel_detected", { value: channel });
+
+  const finish = async (finalStatus: "success" | "blocked" | "failed", blockedReason = "", blockedStep = "") => {
     debug.final_status = finalStatus;
     debug.blocked_reason = blockedReason;
+    debug.failure_reason = blockedReason;
+    debug.exact_blocked_step = blockedStep;
     debug.updated_at = new Date().toISOString();
-    diagnosticLog("final_status", { value: finalStatus, blocked_reason: blockedReason || null });
+    trace("final_status", { value: finalStatus, blocked_step: blockedStep || null, failure_reason: blockedReason || null });
     await saveInstagramBotDebug(supabase, resolvedTenantId, debug);
     return { finalStatus, blockedReason };
   };
 
-  if (channel !== "instagram_direct") return await finish("blocked", "instagram_direct_channel_disabled");
-  if (!resolvedTenantId) return await finish("blocked", "missing_tenant_id");
-  if (!conversation_id) return await finish("blocked", "missing_conversation_id");
-  if (!sender_id) return await finish("blocked", "missing_sender_id");
-  if (!message_text) return await finish("blocked", "empty_message_text");
+  if (channel !== "instagram_direct") return await finish("blocked", "instagram_channel_disabled", "channel_detected");
+  if (!resolvedTenantId) return await finish("blocked", "send_request_blocked", "tenant_resolution");
+  if (!conversation_id) return await finish("blocked", "send_request_blocked", "conversation_resolution");
+  if (!sender_id) return await finish("blocked", "invalid_recipient_id", "recipient_resolution");
+  if (!message_text) return await finish("blocked", "send_request_blocked", "message_text_validation");
 
   try {
     const { data: company } = await supabase
       .from("companies")
-      .select("id, instagram_access_token, instagram_business_id, instagram_bot_enabled")
+      .select("id, instagram_access_token, instagram_business_id, instagram_page_id, instagram_bot_enabled")
       .eq("id", resolvedTenantId)
       .maybeSingle();
 
@@ -219,43 +230,31 @@ async function processBotReply({
     debug.instagram_channel_enabled = botEnabledForInstagramDirect;
     debug.human_takeover = humanTakeover;
 
-    diagnosticLog("instagram_channel_enabled", { value: botEnabledForInstagramDirect });
-    diagnosticLog("human_takeover_status", { value: humanTakeover });
+    trace("instagram_channel_enabled", { value: botEnabledForInstagramDirect });
+    trace("human_takeover", { value: humanTakeover });
 
     if (!botEnabledForInstagramDirect) {
-      diagnosticLog("trigger_match_result", { value: "not_found" });
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("openai_response_generated", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
+      trace("trigger_found", { value: false });
+      trace("openai_not_called", { value: true });
       debug.trigger_found = false;
-      return await finish("blocked", "instagram_direct_channel_disabled");
+      return await finish("blocked", "instagram_channel_disabled", "instagram_channel_enabled");
     }
 
     if (humanTakeover) {
-      diagnosticLog("trigger_match_result", { value: "not_found" });
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("openai_response_generated", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
+      trace("trigger_found", { value: false });
+      trace("openai_not_called", { value: true });
       debug.trigger_found = false;
-      return await finish("blocked", "human_takeover_active");
+      return await finish("blocked", "human_takeover_enabled", "human_takeover");
     }
 
     if (!company?.instagram_access_token) {
-      diagnosticLog("trigger_match_result", { value: "not_found" });
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("openai_response_generated", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
+      trace("trigger_found", { value: false });
+      trace("openai_not_called", { value: true });
       debug.trigger_found = false;
-      diagnosticLog("page_access_token_found", { value: false });
-      return await finish("blocked", "missing_page_access_token");
+      trace("page_access_token_loaded", { value: false });
+      return await finish("blocked", "page_access_token_missing", "page_access_token_loaded");
     }
-    diagnosticLog("page_access_token_found", { value: true });
+    trace("page_access_token_loaded", { value: true, token_length: String(company.instagram_access_token).length, page_id_present: Boolean(company.instagram_page_id) });
 
     const { data: allAgents } = await supabase
       .from("agents")
