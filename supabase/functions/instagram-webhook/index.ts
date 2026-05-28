@@ -179,6 +179,8 @@ async function processBotReply({
 
   const trace = (event: string, payload: Record<string, unknown> = {}) => {
     diagnosticLog(event, payload);
+    const traceSteps = Array.isArray(debug.trace_steps) ? debug.trace_steps : [];
+    debug.trace_steps = [...traceSteps, { step: event, at: new Date().toISOString(), ...payload }].slice(-40);
     if (event === "instagram_api_endpoint_called") debug.instagram_api_endpoint_called = payload;
     if (event === "instagram_api_response") debug.instagram_api_response = payload.response || asText(payload);
   };
