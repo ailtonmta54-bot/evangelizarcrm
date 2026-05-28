@@ -226,6 +226,29 @@ export function InstagramSettings() {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {needsReconnect && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Permissões insuficientes no Instagram</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>
+                O token salvo não tem as permissões de mensagens necessárias. O bot não consegue responder via Instagram Direct até você reconectar e autorizar TODAS as permissões solicitadas.
+              </p>
+              {missingPerms.length > 0 && (
+                <p className="text-xs font-mono">Faltando: {missingPerms.join(", ")}</p>
+              )}
+              <Button
+                size="sm"
+                onClick={() => connectMutation.mutate()}
+                disabled={isConnecting}
+                className="gap-2 bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 hover:opacity-90 text-white"
+              >
+                {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                Reconectar Instagram
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {isLoading ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
