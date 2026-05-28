@@ -159,26 +159,37 @@ export function InstagramSettings() {
 
   const isConnecting = connectMutation.isPending;
   const debug = ((company as any)?.instagram_bot_debug || {}) as Record<string, any>;
+  const missingPerms: string[] = Array.isArray(debug.missing_permissions) ? debug.missing_permissions : [];
+  const grantedPerms: string[] = Array.isArray(debug.granted_permissions) ? debug.granted_permissions : [];
+  const needsReconnect =
+    debug.integration_status === "permission_error" ||
+    debug.integration_status === "reconnect_required" ||
+    debug.failure_reason === "reconnect_required" ||
+    debug.failure_reason === "invalid_page_access_token" ||
+    missingPerms.length > 0 ||
+    (debug.token_valid === false && (company as any)?.instagram_enabled);
   const debugRows = [
+    ["integration_status", debug.integration_status || (needsReconnect ? "reconnect_required" : "—")],
+    ["token_valid", debug.token_valid === true ? "true" : debug.token_valid === false ? "false" : "—"],
+    ["token_type", debug.token_type || debug.meta_token_debug?.type || "—"],
+    ["page_id", debug.page_id || debug.send_page_id],
+    ["instagram_business_account_id", debug.instagram_business_account_id],
+    ["granted_permissions", grantedPerms.join(", ")],
+    ["missing_permissions", missingPerms.join(", ")],
+    ["last_meta_send_error", debug.last_meta_send_error || debug.meta_api_response || debug.meta_send_api_response],
     ["last_incoming_instagram_message", debug.message_text || debug.last_received_direct_message],
     ["last_openai_response", debug.generated_response || debug.ai_response_generated],
     ["last_send_api_payload", debug.instagram_api_endpoint_called ? JSON.stringify(debug.instagram_api_endpoint_called) : ""],
-    ["last_meta_api_response", debug.instagram_api_response || debug.meta_api_response || debug.meta_send_api_response],
     ["exact_blocked_step", debug.exact_blocked_step],
     ["exact_failure_reason", debug.failure_reason || debug.blocked_reason],
     ["lead_id", debug.lead_id],
     ["conversation_id", debug.conversation_id],
-    ["message_text", debug.message_text || debug.last_received_direct_message],
     ["bot_processor_called", typeof debug.bot_processor_called === "boolean" ? (debug.bot_processor_called ? "true" : "false") : "—"],
     ["active_bot_found", typeof debug.active_bot_found === "boolean" ? (debug.active_bot_found ? "true" : "false") : "—"],
     ["instagram_channel_enabled", typeof debug.instagram_channel_enabled === "boolean" ? (debug.instagram_channel_enabled ? "true" : "false") : "—"],
     ["human_takeover", typeof debug.human_takeover === "boolean" ? (debug.human_takeover ? "true" : "false") : "—"],
     ["trigger_found", typeof debug.trigger_found === "boolean" ? (debug.trigger_found ? "true" : "false") : "—"],
     ["openai_called", debug.openai_called ? "true" : "false"],
-    ["generated_response", debug.generated_response || debug.ai_response_generated],
-    ["instagram_api_endpoint_called", debug.instagram_api_endpoint_called ? JSON.stringify(debug.instagram_api_endpoint_called) : ""],
-    ["meta_api_response", debug.meta_api_response || debug.meta_send_api_response],
-    ["blocked_reason", debug.blocked_reason],
     ["final_status", debug.final_status],
   ];
 
@@ -215,6 +226,29 @@ export function InstagramSettings() {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {needsReconnect && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Permissões insuficientes no Instagram</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>
+                O token salvo não tem as permissões de mensagens necessárias. O bot não consegue responder via Instagram Direct até você reconectar e autorizar TODAS as permissões solicitadas.
+              </p>
+              {missingPerms.length > 0 && (
+                <p className="text-xs font-mono">Faltando: {missingPerms.join(", ")}</p>
+              )}
+              <Button
+                size="sm"
+                onClick={() => connectMutation.mutate()}
+                disabled={isConnecting}
+                className="gap-2 bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 hover:opacity-90 text-white"
+              >
+                {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                Reconectar Instagram
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {isLoading ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Carregando...

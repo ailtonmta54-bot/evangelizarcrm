@@ -214,7 +214,48 @@ Deno.serve(async (req) => {
 
     console.log("[oauth] saving company", { companyId, pageId, igBusinessId, username: profData?.username });
 
-    // 7. Save to company
+    // 6c. Validate Page Access Token scopes BEFORE marking integration as enabled.
+    const REQUIRED_SCOPES = [
+      "instagram_basic",
+      "instagram_manage_messages",
+      "pages_messaging",
+      "pages_show_list",
+      "pages_manage_metadata",
+      "pages_read_engagement",
+    ];
+    let grantedScopes: string[] = [];
+    let tokenValid = false;
+    let tokenType = "";
+    try {
+      const dbgRes = await fetch(
+        `https://graph.facebook.com/v21.0/debug_token?input_token=${encodeURIComponent(pageAccessToken)}&access_token=${encodeURIComponent(`${META_APP_ID}|${META_APP_SECRET}`)}`
+      );
+      const dbgJson = await dbgRes.json();
+      const dbg = dbgJson?.data || {};
+      tokenValid = !!dbg.is_valid;
+      tokenType = dbg.type || "";
+      const flat = Array.isArray(dbg.scopes) ? dbg.scopes : [];
+      const granular = Array.isArray(dbg.granular_scopes)
+        ? dbg.granular_scopes.map((g: any) => g.scope).filter(Boolean)
+        : [];
+      grantedScopes = Array.from(new Set([...flat, ...granular]));
+    } catch (e) {
+      console.error("[oauth] debug_token failed", e);
+    }
+    const missingScopes = REQUIRED_SCOPES.filter((s) => !grantedScopes.includes(s));
+    const integrationStatus = missingScopes.length === 0 && tokenValid ? "connected" : "permission_error";
+
+    // Live test: send a no-op messaging_type lookup to confirm the token works for messaging
+    let liveSendCheck: any = { skipped: true };
+    if (integrationStatus === "connected") {
+      const probeRes = await fetch(
+        `https://graph.facebook.com/v21.0/${pageId}?fields=id,name,access_token&access_token=${encodeURIComponent(pageAccessToken)}`
+      );
+      const probeJson = await probeRes.json().catch(() => ({}));
+      liveSendCheck = { ok: probeRes.ok, status: probeRes.status, body: probeJson };
+    }
+
+    // 7. Save to company (only enable when scopes + validation pass)
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
     const { error: upErr } = await supabase
       .from("companies")
@@ -226,7 +267,20 @@ Deno.serve(async (req) => {
         instagram_profile_pic_url: profData?.profile_picture_url || "",
         instagram_connected_at: new Date().toISOString(),
         instagram_token_expires_at: expiresAt,
-        instagram_enabled: true,
+        instagram_enabled: integrationStatus === "connected",
+        instagram_bot_debug: {
+          integration_status: integrationStatus,
+          token_valid: tokenValid,
+          token_type: tokenType,
+          page_id: pageId,
+          instagram_business_account_id: igBusinessId,
+          granted_permissions: grantedScopes,
+          missing_permissions: missingScopes,
+          live_send_check: liveSendCheck,
+          last_meta_send_error: "",
+          checked_at: new Date().toISOString(),
+        },
+        instagram_bot_debug_updated_at: new Date().toISOString(),
       })
       .eq("id", companyId);
 
@@ -234,6 +288,10 @@ Deno.serve(async (req) => {
     if (upErr) {
       console.error("save company error", upErr);
       return fail("save_failed");
+    }
+
+    if (integrationStatus !== "connected") {
+      return fail("missing_permissions:" + missingScopes.join(","));
     }
 
     return ok();

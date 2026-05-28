@@ -30,6 +30,7 @@ async function sendIgMessage(
   // not the Instagram Business Account id. The graph.instagram.com variants are
   // kept only as fallback for Business Login token shapes.
   const endpoints = [
+    pageId ? `https://graph.facebook.com/v23.0/${pageId}/messages` : "",
     pageId ? `https://graph.facebook.com/v21.0/${pageId}/messages` : "",
     `https://graph.facebook.com/v21.0/me/messages`,
     `https://graph.instagram.com/v21.0/me/messages`,
@@ -321,14 +322,35 @@ async function processBotReply({
     }
     const storedTokenInfo = await inspectMetaToken(company.instagram_access_token);
     debug.meta_token_debug = storedTokenInfo;
+    const REQUIRED_SEND_SCOPES = ["instagram_manage_messages", "pages_messaging", "pages_read_engagement"];
+    const flatScopes = Array.isArray(storedTokenInfo?.scopes) ? storedTokenInfo.scopes : [];
+    const granScopes = Array.isArray(storedTokenInfo?.granular_scopes)
+      ? storedTokenInfo!.granular_scopes!.map((g: any) => g.scope).filter(Boolean)
+      : [];
+    const grantedAll = Array.from(new Set([...flatScopes, ...granScopes]));
+    const missingSendScopes = REQUIRED_SEND_SCOPES.filter((s) => !grantedAll.includes(s));
+    debug.granted_permissions = grantedAll;
+    debug.missing_permissions = missingSendScopes;
+    debug.token_valid = storedTokenInfo?.is_valid ?? false;
+    debug.token_type = storedTokenInfo?.type || "unknown";
+    debug.page_id = company.instagram_page_id || "";
+    debug.instagram_business_account_id = company.instagram_business_id || "";
+
     trace("page_access_token_loaded", {
       value: true,
       token_length: String(company.instagram_access_token).length,
       page_id_present: Boolean(company.instagram_page_id),
       token_valid: storedTokenInfo?.is_valid ?? null,
       token_type: storedTokenInfo?.type || "unknown",
-      token_scopes: storedTokenInfo?.scopes || [],
+      token_scopes: grantedAll,
+      missing_scopes: missingSendScopes,
     });
+
+    if (!storedTokenInfo?.is_valid || missingSendScopes.length > 0) {
+      debug.integration_status = "reconnect_required";
+      debug.last_meta_send_error = `missing_permissions:${missingSendScopes.join(",")}`;
+      return await finish("failed", "reconnect_required", "page_access_token_loaded");
+    }
 
     const { data: allAgents } = await supabase
       .from("agents")

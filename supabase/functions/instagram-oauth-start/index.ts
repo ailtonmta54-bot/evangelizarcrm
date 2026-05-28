@@ -11,6 +11,7 @@ const SCOPES = [
   "pages_messaging",
   "pages_show_list",
   "pages_manage_metadata",
+  "pages_read_engagement",
   "business_management",
 ].join(",");
 
@@ -78,6 +79,7 @@ Deno.serve(async (req) => {
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&state=${encodeURIComponent(state + (returnTo ? "|" + returnTo : ""))}` +
       `&scope=${encodeURIComponent(SCOPES)}` +
+      `&auth_type=rerequest` +
       `&response_type=code`;
 
     return new Response(JSON.stringify({ url: authUrl }), {
