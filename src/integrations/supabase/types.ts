@@ -319,6 +319,8 @@ export type Database = {
           instagram_access_token: string | null
           instagram_app_id: string | null
           instagram_app_secret: string | null
+          instagram_bot_debug: Json
+          instagram_bot_debug_updated_at: string | null
           instagram_bot_enabled: boolean
           instagram_business_id: string | null
           instagram_connected_at: string | null
@@ -342,6 +344,8 @@ export type Database = {
           instagram_access_token?: string | null
           instagram_app_id?: string | null
           instagram_app_secret?: string | null
+          instagram_bot_debug?: Json
+          instagram_bot_debug_updated_at?: string | null
           instagram_bot_enabled?: boolean
           instagram_business_id?: string | null
           instagram_connected_at?: string | null
@@ -365,6 +369,8 @@ export type Database = {
           instagram_access_token?: string | null
           instagram_app_id?: string | null
           instagram_app_secret?: string | null
+          instagram_bot_debug?: Json
+          instagram_bot_debug_updated_at?: string | null
           instagram_bot_enabled?: boolean
           instagram_business_id?: string | null
           instagram_connected_at?: string | null
