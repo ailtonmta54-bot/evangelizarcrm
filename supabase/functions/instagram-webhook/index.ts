@@ -17,17 +17,24 @@ function autoTagsFor(text: string): string[] {
   return tags;
 }
 
-async function sendIgMessage(token: string, businessId: string, recipientId: string, text: string) {
-  // Try endpoints in order. Instagram Login (Business Login for Instagram) uses
-  // graph.instagram.com/me/messages. Facebook Page-linked IG uses
-  // graph.facebook.com/me/messages with a Page Access Token. We fall back through
-  // variants to survive different connection types.
+async function sendIgMessage(
+  token: string,
+  businessId: string,
+  pageId: string,
+  recipientId: string,
+  text: string,
+  trace?: (event: string, payload?: Record<string, unknown>) => void,
+) {
+  // Current OAuth stores a Facebook Page Access Token. Instagram Direct replies
+  // must be sent through the Messenger API for Instagram using the PAGE id,
+  // not the Instagram Business Account id. The graph.instagram.com variants are
+  // kept only as fallback for Business Login token shapes.
   const endpoints = [
-    `https://graph.instagram.com/v21.0/me/messages`,
-    `https://graph.instagram.com/v21.0/${businessId}/messages`,
+    pageId ? `https://graph.facebook.com/v21.0/${pageId}/messages` : "",
     `https://graph.facebook.com/v21.0/me/messages`,
-    `https://graph.facebook.com/v21.0/${businessId}/messages`,
-  ];
+    `https://graph.instagram.com/v21.0/me/messages`,
+    businessId ? `https://graph.instagram.com/v21.0/${businessId}/messages` : "",
+  ].filter(Boolean);
   const body = JSON.stringify({
     recipient: { id: recipientId },
     message: { text },
@@ -38,6 +45,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
   let lastText = "";
   for (const url of endpoints) {
     try {
+      trace?.("instagram_api_endpoint_called", { endpoint: url, recipient_id: recipientId, payload: body });
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -48,6 +56,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
       try { result = responseText ? JSON.parse(responseText) : {}; } catch (_) { result = responseText; }
       lastResult = result;
       lastText = responseText || JSON.stringify(result);
+      trace?.("instagram_api_response", { endpoint: url, ok: res.ok, status: res.status, response: lastText });
       if (res.ok) {
         console.log(`IG send ok via ${url}`);
         return { ok: true, result, responseText: lastText, endpoint: url };
@@ -62,6 +71,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
     } catch (e) {
       lastText = String(e);
       console.error(`IG send threw via ${url}:`, lastText);
+      trace?.("instagram_api_response", { endpoint: url, ok: false, response: lastText });
     }
   }
   return { ok: false, result: lastResult, responseText: lastText };
@@ -97,6 +107,65 @@ function asText(value: unknown): string {
   } catch (_) {
     return String(value);
   }
+}
+
+async function inspectMetaToken(token: string) {
+  const appId = Deno.env.get("META_APP_ID");
+  const appSecret = Deno.env.get("META_APP_SECRET");
+  if (!appId || !appSecret || !token) return null;
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
+    );
+    const raw = await res.text();
+    const json = raw ? JSON.parse(raw) : {};
+    const data = json?.data || {};
+    return {
+      ok: res.ok,
+      is_valid: data.is_valid,
+      type: data.type,
+      expires_at: data.expires_at,
+      scopes: data.scopes || [],
+      granular_scopes: data.granular_scopes || [],
+      error: json?.error?.message || "",
+    };
+  } catch (error) {
+    return { ok: false, error: asText(error), scopes: [] };
+  }
+}
+
+async function resolvePageAccessToken(
+  storedToken: string,
+  pageId: string,
+  businessId: string,
+  trace: (event: string, payload?: Record<string, unknown>) => void,
+) {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${encodeURIComponent(storedToken)}`
+    );
+    const raw = await res.text();
+    let json: any = {};
+    try { json = raw ? JSON.parse(raw) : {}; } catch (_) { json = { raw }; }
+    const pages = Array.isArray(json?.data) ? json.data : [];
+    const matched = pages.find((page: any) =>
+      (pageId && page.id === pageId) || (businessId && page.instagram_business_account?.id === businessId)
+    );
+    trace("page_access_token_resolution_response", {
+      ok: res.ok,
+      status: res.status,
+      pages_found: pages.length,
+      matched_page_id: matched?.id || "",
+      matched_business_id: matched?.instagram_business_account?.id || "",
+      error: json?.error?.message || "",
+    });
+    if (matched?.access_token) {
+      return { token: matched.access_token as string, pageId: matched.id as string, source: "resolved_from_user_token" };
+    }
+  } catch (error) {
+    trace("page_access_token_resolution_response", { ok: false, error: asText(error) });
+  }
+  return { token: storedToken, pageId, source: "stored_token" };
 }
 
 async function saveInstagramBotDebug(supabase: any, tenantId: string | undefined, debug: Record<string, unknown>) {
@@ -150,12 +219,18 @@ async function processBotReply({
     sender_id: sender_id || "",
     channel,
     bot_processor_called: true,
+    trace_steps: [
+      { step: "instagram_webhook_received", at: new Date().toISOString(), tenant_id: resolvedTenantId || "", channel },
+      { step: "instagram_message_saved", at: new Date().toISOString(), tenant_id: resolvedTenantId || "", lead_id: lead_id || "", conversation_id: conversation_id || "", message_id: message_id || "" },
+    ],
     active_bot_found: null,
     instagram_channel_enabled: null,
     bot_enabled: null,
     human_takeover: null,
     trigger_found: null,
     openai_called: false,
+    exact_blocked_step: "",
+    failure_reason: "",
     generated_response: "",
     ai_response_generated: "",
     meta_api_response: "",
@@ -165,27 +240,38 @@ async function processBotReply({
     updated_at: new Date().toISOString(),
   };
 
-  diagnosticLog("bot_processor_called", { tenant_id: resolvedTenantId, company_id: company_id || resolvedTenantId, channel, lead_id, conversation_id, message_id, sender_id });
+  const trace = (event: string, payload: Record<string, unknown> = {}) => {
+    diagnosticLog(event, payload);
+    const traceSteps = Array.isArray(debug.trace_steps) ? debug.trace_steps : [];
+    debug.trace_steps = [...traceSteps, { step: event, at: new Date().toISOString(), ...payload }].slice(-40);
+    if (event === "instagram_api_endpoint_called") debug.instagram_api_endpoint_called = payload;
+    if (event === "instagram_api_response") debug.instagram_api_response = payload.response || asText(payload);
+  };
 
-  const finish = async (finalStatus: "replied" | "blocked" | "failed", blockedReason = "") => {
+  trace("bot_trigger_attempt_started", { tenant_id: resolvedTenantId, company_id: company_id || resolvedTenantId, channel, lead_id, conversation_id, message_id, sender_id });
+  trace("channel_detected", { value: channel });
+
+  const finish = async (finalStatus: "success" | "blocked" | "failed", blockedReason = "", blockedStep = "") => {
     debug.final_status = finalStatus;
     debug.blocked_reason = blockedReason;
+    debug.failure_reason = blockedReason;
+    debug.exact_blocked_step = blockedStep;
     debug.updated_at = new Date().toISOString();
-    diagnosticLog("final_status", { value: finalStatus, blocked_reason: blockedReason || null });
+    trace("final_status", { value: finalStatus, blocked_step: blockedStep || null, failure_reason: blockedReason || null });
     await saveInstagramBotDebug(supabase, resolvedTenantId, debug);
     return { finalStatus, blockedReason };
   };
 
-  if (channel !== "instagram_direct") return await finish("blocked", "instagram_direct_channel_disabled");
-  if (!resolvedTenantId) return await finish("blocked", "missing_tenant_id");
-  if (!conversation_id) return await finish("blocked", "missing_conversation_id");
-  if (!sender_id) return await finish("blocked", "missing_sender_id");
-  if (!message_text) return await finish("blocked", "empty_message_text");
+  if (channel !== "instagram_direct") return await finish("blocked", "instagram_channel_disabled", "channel_detected");
+  if (!resolvedTenantId) return await finish("blocked", "send_request_blocked", "tenant_resolution");
+  if (!conversation_id) return await finish("blocked", "send_request_blocked", "conversation_resolution");
+  if (!sender_id) return await finish("blocked", "invalid_recipient_id", "recipient_resolution");
+  if (!message_text) return await finish("blocked", "send_request_blocked", "message_text_validation");
 
   try {
     const { data: company } = await supabase
       .from("companies")
-      .select("id, instagram_access_token, instagram_business_id, instagram_bot_enabled")
+      .select("id, instagram_access_token, instagram_business_id, instagram_page_id, instagram_bot_enabled")
       .eq("id", resolvedTenantId)
       .maybeSingle();
 
@@ -209,43 +295,40 @@ async function processBotReply({
     debug.instagram_channel_enabled = botEnabledForInstagramDirect;
     debug.human_takeover = humanTakeover;
 
-    diagnosticLog("instagram_channel_enabled", { value: botEnabledForInstagramDirect });
-    diagnosticLog("human_takeover_status", { value: humanTakeover });
+    trace("instagram_channel_enabled", { value: botEnabledForInstagramDirect });
+    trace("human_takeover", { value: humanTakeover });
 
     if (!botEnabledForInstagramDirect) {
-      diagnosticLog("trigger_match_result", { value: "not_found" });
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("openai_response_generated", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
+      trace("trigger_found", { value: false });
+      trace("openai_not_called", { value: true });
       debug.trigger_found = false;
-      return await finish("blocked", "instagram_direct_channel_disabled");
+      return await finish("blocked", "instagram_channel_disabled", "instagram_channel_enabled");
     }
 
     if (humanTakeover) {
-      diagnosticLog("trigger_match_result", { value: "not_found" });
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("openai_response_generated", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
+      trace("trigger_found", { value: false });
+      trace("openai_not_called", { value: true });
       debug.trigger_found = false;
-      return await finish("blocked", "human_takeover_active");
+      return await finish("blocked", "human_takeover_enabled", "human_takeover");
     }
 
     if (!company?.instagram_access_token) {
-      diagnosticLog("trigger_match_result", { value: "not_found" });
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("openai_response_generated", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
+      trace("trigger_found", { value: false });
+      trace("openai_not_called", { value: true });
       debug.trigger_found = false;
-      diagnosticLog("page_access_token_found", { value: false });
-      return await finish("blocked", "missing_page_access_token");
+      trace("page_access_token_loaded", { value: false });
+      return await finish("blocked", "page_access_token_missing", "page_access_token_loaded");
     }
-    diagnosticLog("page_access_token_found", { value: true });
+    const storedTokenInfo = await inspectMetaToken(company.instagram_access_token);
+    debug.meta_token_debug = storedTokenInfo;
+    trace("page_access_token_loaded", {
+      value: true,
+      token_length: String(company.instagram_access_token).length,
+      page_id_present: Boolean(company.instagram_page_id),
+      token_valid: storedTokenInfo?.is_valid ?? null,
+      token_type: storedTokenInfo?.type || "unknown",
+      token_scopes: storedTokenInfo?.scopes || [],
+    });
 
     const { data: allAgents } = await supabase
       .from("agents")
@@ -253,6 +336,7 @@ async function processBotReply({
       .eq("company_id", resolvedTenantId)
       .eq("active", true);
 
+    trace("trigger_search_started", { agents_loaded: allAgents?.length || 0, message_text });
     const instagramAgents = (allAgents || []).filter((agent: any) =>
       ["instagram", "instagram_direct", "both"].includes(agent.channel)
     );
@@ -264,22 +348,19 @@ async function processBotReply({
     debug.active_bot_found = Boolean(agent);
 
     debug.trigger_found = triggerFound;
-    diagnosticLog("active_bot_found", { value: Boolean(agent), agent_id: agent?.id || null });
-    diagnosticLog("trigger_match_result", { value: triggerFound ? "found" : "not_found", agent_id: triggerAgent?.id || null });
+    trace("active_bot_loaded", { value: Boolean(agent), agent_id: agent?.id || null });
+    trace("trigger_found", { value: triggerFound, agent_id: triggerAgent?.id || null, selected_agent_id: agent?.id || null });
 
     if (!agent) {
-      diagnosticLog("openai_called", { value: false });
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("blocked", "no_active_bot_found");
+      trace("openai_not_called", { value: true });
+      return await finish("blocked", "no_active_bot", "active_bot_loaded");
     }
 
     if (!lead?.agent_id) {
       await supabase.from("leads").update({ agent_id: agent.id }).eq("id", lead_id);
     }
 
-    diagnosticLog("openai_called", { value: true });
+    trace("openai_request_started", { lead_id, agent_id: agent.id, company_id: resolvedTenantId });
     debug.openai_called = true;
 
     const sdrResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/sdr-ai-respond`, {
@@ -304,58 +385,82 @@ async function processBotReply({
     }
 
     if (!sdrResponse.ok || sdrResult.error) {
-      diagnosticLog("ai_response_text", { value: "" });
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("failed", "openai_error");
+      trace("openai_response_generated", { value: "", ok: false, response: sdrRaw });
+      return await finish("failed", "openai_not_called", "openai_request_started");
     }
 
     const aiMessage = String(sdrResult.message || "").trim();
-    diagnosticLog("openai_response_generated", { value: Boolean(aiMessage) });
-    diagnosticLog("ai_response_text", { value: aiMessage });
+    trace("openai_response_generated", { value: aiMessage });
     debug.generated_response = aiMessage;
     debug.ai_response_generated = aiMessage;
 
     if (!aiMessage) {
-      diagnosticLog("instagram_send_api_called", { value: false });
-      diagnosticLog("instagram_send_api_response", { value: "" });
-      return await finish("failed", "empty_openai_response");
+      return await finish("failed", "openai_response_empty", "openai_response_generated");
     }
 
-    diagnosticLog("instagram_send_api_called", { value: true });
-    const sendResult = await sendIgMessage(
+    if (!sender_id || !/^\d+$/.test(String(sender_id))) {
+      return await finish("failed", "invalid_recipient_id", "instagram_send_request_started");
+    }
+
+    const resolvedSendAuth = await resolvePageAccessToken(
       company.instagram_access_token,
+      company.instagram_page_id || "",
+      company.instagram_business_id || "",
+      trace,
+    );
+    debug.send_token_source = resolvedSendAuth.source;
+    debug.send_page_id = resolvedSendAuth.pageId || "";
+    const sendTokenInfo = await inspectMetaToken(resolvedSendAuth.token);
+    debug.send_token_debug = sendTokenInfo;
+
+    trace("instagram_send_request_started", {
+      recipient_id: sender_id,
+      page_id_present: Boolean(resolvedSendAuth.pageId),
+      business_id_present: Boolean(company.instagram_business_id),
+      token_source: resolvedSendAuth.source,
+      token_valid: sendTokenInfo?.is_valid ?? null,
+      token_type: sendTokenInfo?.type || "unknown",
+      token_scopes: sendTokenInfo?.scopes || [],
+    });
+    const sendResult = await sendIgMessage(
+      resolvedSendAuth.token,
       company.instagram_business_id,
+      resolvedSendAuth.pageId,
       sender_id,
-      aiMessage
+      aiMessage,
+      trace,
     );
     const sendResponseText = sendResult.responseText || asText(sendResult.result);
-    diagnosticLog("instagram_send_api_response", { value: sendResponseText });
     debug.meta_api_response = sendResponseText;
     debug.meta_send_api_response = sendResponseText;
 
     if (!sendResult.ok) {
-      return await finish("failed", "instagram_send_api_error");
+      const lowerResponse = sendResponseText.toLowerCase();
+      const reason = lowerResponse.includes("cannot parse access token") || lowerResponse.includes("invalid oauth access token")
+        ? "invalid_page_access_token"
+        : "instagram_send_api_failed";
+      return await finish("failed", reason, "instagram_api_response");
     }
 
-    await supabase.from("messages").insert({
+    const { error: replySaveError } = await supabase.from("messages").insert({
       lead_id,
       content: aiMessage,
       type: "enviada",
       company_id: resolvedTenantId,
       channel: "instagram_direct",
     });
-    diagnosticLog("bot_reply_saved", { value: true, lead_id, conversation_id });
+    if (replySaveError) {
+      trace("reply_saved_to_database", { value: false, error: replySaveError.message });
+      return await finish("failed", "database_reply_save_failed", "reply_saved_to_database");
+    }
+    trace("reply_saved_to_database", { value: true, lead_id, conversation_id });
 
-    return await finish("replied");
+    return await finish("success");
   } catch (error) {
-    diagnosticLog("ai_response_text", { value: "" });
-    diagnosticLog("openai_response_generated", { value: false });
-    diagnosticLog("instagram_send_api_called", { value: false });
-    diagnosticLog("instagram_send_api_response", { value: asText(error) });
+    trace("instagram_api_response", { value: asText(error) });
     debug.meta_api_response = asText(error);
     debug.meta_send_api_response = asText(error);
-    return await finish("failed", "openai_error");
+    return await finish("failed", "trigger_logic_error", "bot_processor_exception");
   }
 }
 
