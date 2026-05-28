@@ -191,10 +191,10 @@ export default function Robos() {
   const { data: agentSecrets } = useQuery({
     queryKey: ["agent-secrets", selectedAgentId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_agent_secrets", { _agent_id: selectedAgentId! });
+      const { data, error } = await (supabase as any).rpc("get_agent_secrets", { _agent_id: selectedAgentId! });
       if (error) throw error;
-      return (data?.[0] ?? { whatsapp_token: "", whatsapp_verify_token: "", zapi_token: "" }) as {
-        whatsapp_token: string; whatsapp_verify_token: string; zapi_token: string;
+      return (data?.[0] ?? { whatsapp_token: "", whatsapp_verify_token: "", zapi_token: "", zapi_instance_id: "" }) as {
+        whatsapp_token: string; whatsapp_verify_token: string; zapi_token: string; zapi_instance_id: string;
       };
     },
     enabled: !!selectedAgentId,
@@ -242,6 +242,20 @@ export default function Robos() {
       queryClient.invalidateQueries({ queryKey: ["agents"] });
     },
     onError: () => toast.error("Erro ao salvar"),
+  });
+
+  const saveSecretMutation = useMutation({
+    mutationFn: async ({ field, value }: { field: string; value: any }) => {
+      if (!currentAgent) return;
+      const { error } = await (supabase as any).rpc("save_agent_secret", {
+        _agent_id: currentAgent.id,
+        _field: field,
+        _value: String(value ?? ""),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agent-secrets", selectedAgentId] }),
+    onError: () => toast.error("Erro ao salvar credencial"),
   });
 
   const deleteMutation = useMutation({
@@ -306,6 +320,10 @@ export default function Robos() {
 
   // Save field with debounced auto-save on blur
   const saveField = (field: string, value: any) => {
+    if (["whatsapp_token", "whatsapp_verify_token", "zapi_token", "zapi_instance_id"].includes(field)) {
+      saveSecretMutation.mutate({ field, value });
+      return;
+    }
     updateField.mutate({ [field]: value });
   };
 
