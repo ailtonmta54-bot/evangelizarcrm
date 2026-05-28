@@ -17,17 +17,24 @@ function autoTagsFor(text: string): string[] {
   return tags;
 }
 
-async function sendIgMessage(token: string, businessId: string, recipientId: string, text: string) {
-  // Try endpoints in order. Instagram Login (Business Login for Instagram) uses
-  // graph.instagram.com/me/messages. Facebook Page-linked IG uses
-  // graph.facebook.com/me/messages with a Page Access Token. We fall back through
-  // variants to survive different connection types.
+async function sendIgMessage(
+  token: string,
+  businessId: string,
+  pageId: string,
+  recipientId: string,
+  text: string,
+  trace?: (event: string, payload?: Record<string, unknown>) => void,
+) {
+  // Current OAuth stores a Facebook Page Access Token. Instagram Direct replies
+  // must be sent through the Messenger API for Instagram using the PAGE id,
+  // not the Instagram Business Account id. The graph.instagram.com variants are
+  // kept only as fallback for Business Login token shapes.
   const endpoints = [
-    `https://graph.instagram.com/v21.0/me/messages`,
-    `https://graph.instagram.com/v21.0/${businessId}/messages`,
+    pageId ? `https://graph.facebook.com/v21.0/${pageId}/messages` : "",
     `https://graph.facebook.com/v21.0/me/messages`,
-    `https://graph.facebook.com/v21.0/${businessId}/messages`,
-  ];
+    `https://graph.instagram.com/v21.0/me/messages`,
+    businessId ? `https://graph.instagram.com/v21.0/${businessId}/messages` : "",
+  ].filter(Boolean);
   const body = JSON.stringify({
     recipient: { id: recipientId },
     message: { text },
@@ -38,6 +45,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
   let lastText = "";
   for (const url of endpoints) {
     try {
+      trace?.("instagram_api_endpoint_called", { endpoint: url, recipient_id: recipientId, payload: body });
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -48,6 +56,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
       try { result = responseText ? JSON.parse(responseText) : {}; } catch (_) { result = responseText; }
       lastResult = result;
       lastText = responseText || JSON.stringify(result);
+      trace?.("instagram_api_response", { endpoint: url, ok: res.ok, status: res.status, response: lastText });
       if (res.ok) {
         console.log(`IG send ok via ${url}`);
         return { ok: true, result, responseText: lastText, endpoint: url };
@@ -62,6 +71,7 @@ async function sendIgMessage(token: string, businessId: string, recipientId: str
     } catch (e) {
       lastText = String(e);
       console.error(`IG send threw via ${url}:`, lastText);
+      trace?.("instagram_api_response", { endpoint: url, ok: false, response: lastText });
     }
   }
   return { ok: false, result: lastResult, responseText: lastText };
