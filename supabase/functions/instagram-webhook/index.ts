@@ -467,6 +467,39 @@ Deno.serve(async (req) => {
           sender_id: senderId,
         });
 
+        try {
+          await processIncomingMessageBotReply({
+          tenant_id: companyId,
+          channel: "instagram_direct",
+          lead_id: lead.id,
+          conversation_id: lead.id,
+          message_id: messageId,
+          sender_id: senderId,
+          message_text: messageText,
+          });
+        } catch (processorError) {
+          diagnosticLog("bot_processor_called", { tenant_id: companyId, lead_id: lead.id, error: asText(processorError) });
+          diagnosticLog("final_status", { value: "failed", blocked_reason: "bot_processor_not_called" });
+          await saveInstagramBotDebug(supabase, companyId, {
+            last_received_direct_message: messageText,
+            tenant_id: companyId,
+            conversation_id: lead.id,
+            lead_id: lead.id,
+            message_id: messageId,
+            sender_id: senderId,
+            channel: "instagram_direct",
+            bot_enabled: null,
+            human_takeover: null,
+            trigger_found: null,
+            openai_called: false,
+            ai_response_generated: "",
+            meta_send_api_response: asText(processorError),
+            blocked_reason: "bot_processor_not_called",
+            final_status: "failed",
+            updated_at: new Date().toISOString(),
+          });
+        }
+
         // Auto-tag
         const newTags = autoTagsFor(messageText);
         if (newTags.length > 0) {
@@ -476,16 +509,6 @@ Deno.serve(async (req) => {
         } else {
           await supabase.from("leads").update({ updated_at: new Date().toISOString() }).eq("id", lead.id);
         }
-
-        await processIncomingMessageBotReply({
-          tenant_id: companyId,
-          channel: "instagram_direct",
-          lead_id: lead.id,
-          conversation_id: lead.id,
-          message_id: messageId,
-          sender_id: senderId,
-          message_text: messageText,
-        });
 
       }
     }
