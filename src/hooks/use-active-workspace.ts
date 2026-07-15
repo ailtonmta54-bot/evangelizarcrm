@@ -56,9 +56,9 @@ export function useActiveWorkspace() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["profile-active-ws"] });
-      qc.invalidateQueries({ queryKey: ["agents"] });
-      qc.invalidateQueries({ queryKey: ["workspace-agents"] });
+      // Ao trocar de workspace, todos os dados escopados (leads, mensagens,
+      // produtos, automações, fluxos, sdr, robôs) precisam ser recarregados.
+      qc.invalidateQueries();
     },
   });
 
