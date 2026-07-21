@@ -881,7 +881,7 @@ export default function Robos() {
                     <div className="rounded-lg border border-dashed p-8 text-center">
                       <FileUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                       <p className="text-sm font-medium mb-1">Envie um documento</p>
-                      <p className="text-xs text-muted-foreground mb-4">CSV ou TXT com até 10MB</p>
+                      <p className="text-xs text-muted-foreground mb-4">PDF, CSV ou TXT com até 20MB</p>
                       <Button
                         variant="outline"
                         className="gap-1.5"
