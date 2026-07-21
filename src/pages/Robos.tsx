@@ -739,14 +739,17 @@ export default function Robos() {
                         }
                         setDocLoading(true);
                         try {
-                          const raw = await file.text();
+                          let raw = await file.text();
+                          // Strip UTF-8 BOM
+                          if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
                           const isCsv = /\.csv$/i.test(file.name) || file.type === "text/csv";
                           let extracted = raw;
                           if (isCsv) {
-                            // Simple CSV parser (handles quoted fields and commas/;)
                             const detectDelim = (line: string) => {
                               const c = (line.match(/,/g) || []).length;
                               const s = (line.match(/;/g) || []).length;
+                              const t = (line.match(/\t/g) || []).length;
+                              if (t > c && t > s) return "\t";
                               return s > c ? ";" : ",";
                             };
                             const parseCsv = (text: string, delim: string) => {
@@ -771,28 +774,82 @@ export default function Robos() {
                               if (field.length || cur.length) { cur.push(field); rows.push(cur); }
                               return rows.filter(r => r.some(c => c.trim().length));
                             };
+                            // Clean HTML/escape sequences from a cell so the bot reads plain text
+                            const cleanCell = (v: string, maxLen = 260) => {
+                              let s = (v ?? "")
+                                .replace(/\\n/g, " ")
+                                .replace(/\\r/g, " ")
+                                .replace(/\\t/g, " ")
+                                .replace(/<style[\s\S]*?<\/style>/gi, " ")
+                                .replace(/<script[\s\S]*?<\/script>/gi, " ")
+                                .replace(/<[^>]+>/g, " ")
+                                .replace(/&nbsp;/gi, " ")
+                                .replace(/&amp;/gi, "&")
+                                .replace(/&lt;/gi, "<")
+                                .replace(/&gt;/gi, ">")
+                                .replace(/&quot;/gi, '"')
+                                .replace(/&#39;/gi, "'")
+                                .replace(/\s+/g, " ")
+                                .trim();
+                              if (s.length > maxLen) s = s.slice(0, maxLen).trim() + "…";
+                              return s;
+                            };
                             const firstLine = raw.split(/\r?\n/)[0] || "";
                             const delim = detectDelim(firstLine);
                             const rows = parseCsv(raw, delim);
-                            if (rows.length === 0) {
-                              throw new Error("CSV vazio");
-                            }
-                            const headers = rows[0].map(h => h.trim());
+                            if (rows.length === 0) throw new Error("CSV vazio");
+                            const headers = rows[0].map(h => h.trim().replace(/^\uFEFF/, ""));
                             const body = rows.slice(1);
-                            extracted = body.map((r, idx) => {
+                            console.log("[CSV import]", { file: file.name, delim, headers, rows: body.length });
+                            // Detect common WooCommerce/product columns
+                            const findIdx = (patterns: RegExp[]) =>
+                              headers.findIndex(h => patterns.some(p => p.test(h)));
+                            const idxNome = findIdx([/^nome$/i, /^name$/i, /produto/i, /title/i]);
+                            const idxPreco = findIdx([/^preço$/i, /^preco$/i, /^price$/i, /valor/i]);
+                            const idxDescCurta = findIdx([/descri.*curta/i, /short.*desc/i, /resumo/i]);
+                            const idxDesc = findIdx([/^descri/i, /^description$/i]);
+                            const idxSku = findIdx([/^sku$/i, /código/i, /codigo/i]);
+                            const idxCat = findIdx([/categoria/i, /categor/i]);
+
+                            const useProductFormat = idxNome >= 0 || idxPreco >= 0;
+                            const lines = body.map((r, idx) => {
+                              if (useProductFormat) {
+                                const nome = idxNome >= 0 ? cleanCell(r[idxNome], 140) : "";
+                                const preco = idxPreco >= 0 ? cleanCell(r[idxPreco], 40) : "";
+                                const sku = idxSku >= 0 ? cleanCell(r[idxSku], 40) : "";
+                                const cat = idxCat >= 0 ? cleanCell(r[idxCat], 80) : "";
+                                const short = idxDescCurta >= 0 ? cleanCell(r[idxDescCurta], 220) : "";
+                                const desc = !short && idxDesc >= 0 ? cleanCell(r[idxDesc], 220) : "";
+                                const parts: string[] = [];
+                                if (nome) parts.push(nome);
+                                if (preco) parts.push(`R$ ${preco.replace(/^R\$\s*/i, "")}`);
+                                if (sku) parts.push(`SKU ${sku}`);
+                                if (cat) parts.push(cat);
+                                const summary = short || desc;
+                                let line = `• ${parts.join(" — ")}`;
+                                if (summary) line += `. ${summary}`;
+                                return line;
+                              }
                               const parts = headers.map((h, i) => {
-                                const v = (r[i] ?? "").trim();
+                                const v = cleanCell(r[i], 180);
                                 return v ? `${h}: ${v}` : null;
                               }).filter(Boolean);
                               return `• Item ${idx + 1} — ${parts.join(" | ")}`;
-                            }).join("\n");
-                            extracted = `Lista importada de ${file.name} (${body.length} itens):\n${extracted}`;
+                            });
+                            extracted = `Catálogo importado de ${file.name} (${body.length} itens):\n${lines.join("\n")}`;
                           }
                           const currentKnowledge = currentAgent.knowledge || "";
                           const separator = currentKnowledge ? `\n\n--- Conteúdo de ${file.name} ---\n` : "";
-                          const newKnowledge = (currentKnowledge + separator + extracted).substring(0, 20000);
+                          const combined = currentKnowledge + separator + extracted;
+                          const LIMIT = 20000;
+                          const truncated = combined.length > LIMIT;
+                          const newKnowledge = combined.substring(0, LIMIT);
                           saveField("knowledge", newKnowledge);
-                          toast.success(`Arquivo importado! ${extracted.length} caracteres adicionados.`);
+                          toast.success(
+                            truncated
+                              ? `Importado! ${newKnowledge.length}/${LIMIT} caracteres (conteúdo truncado — reduza colunas ou divida o arquivo).`
+                              : `Arquivo importado! ${extracted.length} caracteres adicionados.`
+                          );
                         } catch (err: any) {
                           console.error("Doc import error:", err);
                           toast.error(err.message || "Erro ao ler o arquivo");
