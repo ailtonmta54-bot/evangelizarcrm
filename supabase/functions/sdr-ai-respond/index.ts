@@ -146,7 +146,10 @@ Deno.serve(async (req) => {
       informar: "Seu objetivo é informar e educar o cliente sobre os produtos/serviços.",
     };
 
-    const knowledgeBlock = agent.knowledge ? `\n\nBase de conhecimento:\n${agent.knowledge}` : "";
+    const knowledgeParts: string[] = [];
+    if (agent.knowledge) knowledgeParts.push(agent.knowledge);
+    if (agent.knowledge_docs) knowledgeParts.push(agent.knowledge_docs);
+    const knowledgeBlock = knowledgeParts.length ? `\n\nBase de conhecimento:\n${knowledgeParts.join("\n\n")}` : "";
 
     const systemPrompt = `Você é "${agent.name}", um assistente virtual inteligente de uma empresa.
 

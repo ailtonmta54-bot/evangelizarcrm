@@ -114,6 +114,7 @@ export type Database = {
           is_default: boolean
           keywords: string | null
           knowledge: string
+          knowledge_docs: string | null
           name: string
           prompt: string
           recognize_audio: boolean | null
@@ -156,6 +157,7 @@ export type Database = {
           is_default?: boolean
           keywords?: string | null
           knowledge?: string
+          knowledge_docs?: string | null
           name: string
           prompt?: string
           recognize_audio?: boolean | null
@@ -198,6 +200,7 @@ export type Database = {
           is_default?: boolean
           keywords?: string | null
           knowledge?: string
+          knowledge_docs?: string | null
           name?: string
           prompt?: string
           recognize_audio?: boolean | null
