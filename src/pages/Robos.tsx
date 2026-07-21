@@ -120,6 +120,8 @@ export default function Robos() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteLoading, setWebsiteLoading] = useState(false);
   const [websiteContent, setWebsiteContent] = useState<string | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ["agents", activeWorkspaceId],
@@ -721,16 +723,102 @@ export default function Robos() {
                   </TabsContent>
 
                   <TabsContent value="documento" className="mt-4 space-y-4">
+                    <input
+                      ref={docFileInputRef}
+                      type="file"
+                      accept=".csv,.txt,text/csv,text/plain"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file || !currentAgent) return;
+                        if (file.size > 10 * 1024 * 1024) {
+                          toast.error("Arquivo maior que 10MB");
+                          return;
+                        }
+                        setDocLoading(true);
+                        try {
+                          const raw = await file.text();
+                          const isCsv = /\.csv$/i.test(file.name) || file.type === "text/csv";
+                          let extracted = raw;
+                          if (isCsv) {
+                            // Simple CSV parser (handles quoted fields and commas/;)
+                            const detectDelim = (line: string) => {
+                              const c = (line.match(/,/g) || []).length;
+                              const s = (line.match(/;/g) || []).length;
+                              return s > c ? ";" : ",";
+                            };
+                            const parseCsv = (text: string, delim: string) => {
+                              const rows: string[][] = [];
+                              let cur: string[] = [];
+                              let field = "";
+                              let inQuotes = false;
+                              for (let i = 0; i < text.length; i++) {
+                                const ch = text[i];
+                                if (inQuotes) {
+                                  if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+                                  else if (ch === '"') inQuotes = false;
+                                  else field += ch;
+                                } else {
+                                  if (ch === '"') inQuotes = true;
+                                  else if (ch === delim) { cur.push(field); field = ""; }
+                                  else if (ch === "\n") { cur.push(field); rows.push(cur); cur = []; field = ""; }
+                                  else if (ch === "\r") { /* skip */ }
+                                  else field += ch;
+                                }
+                              }
+                              if (field.length || cur.length) { cur.push(field); rows.push(cur); }
+                              return rows.filter(r => r.some(c => c.trim().length));
+                            };
+                            const firstLine = raw.split(/\r?\n/)[0] || "";
+                            const delim = detectDelim(firstLine);
+                            const rows = parseCsv(raw, delim);
+                            if (rows.length === 0) {
+                              throw new Error("CSV vazio");
+                            }
+                            const headers = rows[0].map(h => h.trim());
+                            const body = rows.slice(1);
+                            extracted = body.map((r, idx) => {
+                              const parts = headers.map((h, i) => {
+                                const v = (r[i] ?? "").trim();
+                                return v ? `${h}: ${v}` : null;
+                              }).filter(Boolean);
+                              return `• Item ${idx + 1} — ${parts.join(" | ")}`;
+                            }).join("\n");
+                            extracted = `Lista importada de ${file.name} (${body.length} itens):\n${extracted}`;
+                          }
+                          const currentKnowledge = currentAgent.knowledge || "";
+                          const separator = currentKnowledge ? `\n\n--- Conteúdo de ${file.name} ---\n` : "";
+                          const newKnowledge = (currentKnowledge + separator + extracted).substring(0, 10000);
+                          saveField("knowledge", newKnowledge);
+                          toast.success(`Arquivo importado! ${extracted.length} caracteres adicionados.`);
+                        } catch (err: any) {
+                          console.error("Doc import error:", err);
+                          toast.error(err.message || "Erro ao ler o arquivo");
+                        } finally {
+                          setDocLoading(false);
+                        }
+                      }}
+                    />
                     <div className="rounded-lg border border-dashed p-8 text-center">
                       <FileUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                       <p className="text-sm font-medium mb-1">Envie um documento</p>
-                      <p className="text-xs text-muted-foreground mb-4">PDF ou DOCX com até 10MB</p>
-                      <Button variant="outline" className="gap-1.5">
-                        <Upload className="h-4 w-4" /> Selecionar arquivo
+                      <p className="text-xs text-muted-foreground mb-4">CSV ou TXT com até 10MB</p>
+                      <Button
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={docLoading}
+                        onClick={() => docFileInputRef.current?.click()}
+                      >
+                        {docLoading ? (
+                          <><span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" /> Lendo...</>
+                        ) : (
+                          <><Upload className="h-4 w-4" /> Selecionar arquivo</>
+                        )}
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      O conteúdo do documento será extraído e usado como base de conhecimento do robô.
+                      Use CSV para importar listas (ex.: produtos, preços, FAQ). A primeira linha deve conter os títulos das colunas. Aceita separador vírgula (,) ou ponto e vírgula (;).
                     </p>
                   </TabsContent>
                 </Tabs>
