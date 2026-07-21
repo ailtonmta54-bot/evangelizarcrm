@@ -642,15 +642,16 @@ export default function Robos() {
 
                   <TabsContent value="texto" className="mt-4 space-y-2">
                     <Textarea
-                      rows={8}
-                      maxLength={1000}
+                      key={`knowledge-${currentAgent.id}-${(currentAgent.knowledge || "").length}`}
+                      rows={10}
+                      maxLength={20000}
                       defaultValue={currentAgent.knowledge}
                       onBlur={(e) => saveField("knowledge", e.target.value)}
                       placeholder="FAQ, catálogo de produtos, preços, scripts de vendas, informações da empresa..."
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Pequenos conhecimentos, FAQ, informações rápidas</span>
-                      <span>{(currentAgent.knowledge || "").length}/1000</span>
+                      <span>Conteúdo completo da base de conhecimento (edite ou cole diretamente aqui)</span>
+                      <span>{(currentAgent.knowledge || "").length}/20000</span>
                     </div>
                   </TabsContent>
 
