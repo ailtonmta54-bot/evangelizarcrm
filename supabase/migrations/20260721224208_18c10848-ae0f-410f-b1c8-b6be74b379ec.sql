@@ -1,0 +1,1 @@
+ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS knowledge_docs text;
