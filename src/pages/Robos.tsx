@@ -838,17 +838,17 @@ export default function Robos() {
                             });
                             extracted = `Catálogo importado de ${file.name} (${body.length} itens):\n${lines.join("\n")}`;
                           }
-                          const currentKnowledge = currentAgent.knowledge || "";
-                          const separator = currentKnowledge ? `\n\n--- Conteúdo de ${file.name} ---\n` : "";
-                          const combined = currentKnowledge + separator + extracted;
+                          const currentDocs = (currentAgent as any).knowledge_docs || "";
+                          const separator = currentDocs ? `\n\n--- ${file.name} ---\n` : `--- ${file.name} ---\n`;
+                          const combined = currentDocs + separator + extracted;
                           const LIMIT = 50000;
                           const truncated = combined.length > LIMIT;
-                          const newKnowledge = combined.substring(0, LIMIT);
-                          saveField("knowledge", newKnowledge);
+                          const newDocs = combined.substring(0, LIMIT);
+                          saveField("knowledge_docs" as any, newDocs);
                           toast.success(
                             truncated
-                              ? `Importado! ${newKnowledge.length}/${LIMIT} caracteres (conteúdo truncado — reduza colunas ou divida o arquivo).`
-                              : `Arquivo importado! ${extracted.length} caracteres adicionados.`
+                              ? `Documento importado! ${newDocs.length}/${LIMIT} caracteres (conteúdo truncado — reduza colunas ou divida o arquivo).`
+                              : `Documento importado! ${extracted.length} caracteres adicionados à base de documentos.`
                           );
                         } catch (err: any) {
                           console.error("Doc import error:", err);
@@ -875,8 +875,32 @@ export default function Robos() {
                         )}
                       </Button>
                     </div>
+                    {((currentAgent as any).knowledge_docs || "").length > 0 && (
+                      <div className="rounded-lg border p-3 space-y-2 bg-muted/30">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium">Documentos na memória do robô</span>
+                          <span className="text-muted-foreground">{((currentAgent as any).knowledge_docs || "").length}/50000</span>
+                        </div>
+                        <Textarea
+                          key={`kdocs-${currentAgent.id}-${((currentAgent as any).knowledge_docs || "").length}`}
+                          readOnly
+                          rows={6}
+                          className="text-xs font-mono bg-background"
+                          defaultValue={(currentAgent as any).knowledge_docs || ""}
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => saveField("knowledge_docs" as any, "")}
+                          >
+                            Limpar documentos
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground">
-                      Use CSV para importar listas (ex.: produtos, preços, FAQ). A primeira linha deve conter os títulos das colunas. Aceita separador vírgula (,) ou ponto e vírgula (;).
+                      O conteúdo dos documentos é armazenado separadamente e usado pelo robô nas respostas. A aba "Texto" continua exclusiva para instruções que você digita manualmente.
                     </p>
                   </TabsContent>
                 </Tabs>
