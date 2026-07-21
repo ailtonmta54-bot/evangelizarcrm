@@ -644,14 +644,14 @@ export default function Robos() {
                     <Textarea
                       key={`knowledge-${currentAgent.id}-${(currentAgent.knowledge || "").length}`}
                       rows={10}
-                      maxLength={20000}
+                      maxLength={50000}
                       defaultValue={currentAgent.knowledge}
                       onBlur={(e) => saveField("knowledge", e.target.value)}
                       placeholder="FAQ, catálogo de produtos, preços, scripts de vendas, informações da empresa..."
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>Conteúdo completo da base de conhecimento (edite ou cole diretamente aqui)</span>
-                      <span>{(currentAgent.knowledge || "").length}/20000</span>
+                      <span>{(currentAgent.knowledge || "").length}/50000</span>
                     </div>
                   </TabsContent>
 
@@ -681,7 +681,7 @@ export default function Robos() {
                               // Append to existing knowledge
                               const currentKnowledge = currentAgent.knowledge || "";
                               const separator = currentKnowledge ? "\n\n--- Conteúdo extraído de " + websiteUrl + " ---\n" : "";
-                              const newKnowledge = (currentKnowledge + separator + content).substring(0, 20000);
+                              const newKnowledge = (currentKnowledge + separator + content).substring(0, 50000);
                               saveField("knowledge", newKnowledge);
                               toast.success("Conteúdo extraído e adicionado à base de conhecimento!");
                             } catch (err: any) {
@@ -841,7 +841,7 @@ export default function Robos() {
                           const currentKnowledge = currentAgent.knowledge || "";
                           const separator = currentKnowledge ? `\n\n--- Conteúdo de ${file.name} ---\n` : "";
                           const combined = currentKnowledge + separator + extracted;
-                          const LIMIT = 20000;
+                          const LIMIT = 50000;
                           const truncated = combined.length > LIMIT;
                           const newKnowledge = combined.substring(0, LIMIT);
                           saveField("knowledge", newKnowledge);
