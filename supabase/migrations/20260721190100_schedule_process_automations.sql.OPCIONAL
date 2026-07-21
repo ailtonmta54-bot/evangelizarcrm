@@ -1,0 +1,30 @@
+-- OPCIONAL: agenda a função "process-automations" para rodar sozinha
+-- a cada 5 minutos. Sem isso, as automações provavelmente só rodam
+-- quando alguém chama a função manualmente, o que explicaria
+-- follow-ups e mensagens agendadas que não saem sozinhas.
+--
+-- ANTES DE RODAR ESTE ARQUIVO:
+-- 1) Troque SEU_PROJECT_REF pelo ID do seu projeto Supabase
+--    (o mesmo valor que está em VITE_SUPABASE_PROJECT_ID no seu .env)
+-- 2) Troque SUA_SERVICE_ROLE_KEY pela Service Role Key do projeto
+--    (em Supabase > Project Settings > API). NUNCA coloque essa chave
+--    em código do frontend, aqui é seguro porque roda dentro do banco.
+
+select
+  cron.schedule(
+    'process-automations-every-5-min',
+    '*/5 * * * *',
+    $$
+    select net.http_post(
+      url := 'https://SEU_PROJECT_REF.supabase.co/functions/v1/process-automations',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer SUA_SERVICE_ROLE_KEY'
+      ),
+      body := '{}'::jsonb
+    );
+    $$
+  );
+
+-- Para conferir depois se está rodando: select * from cron.job_run_details order by start_time desc limit 10;
+-- Para remover o agendamento no futuro: select cron.unschedule('process-automations-every-5-min');

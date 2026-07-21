@@ -3,8 +3,34 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-hub-signature-256",
 };
+
+// Verifies that the request really came from Meta by checking the
+// X-Hub-Signature-256 header (HMAC-SHA256 of the raw body, keyed with
+// the Meta App Secret). Without this, anyone who finds this URL could
+// POST fake messages into the CRM.
+async function verifyMetaSignature(rawBody: string, signatureHeader: string | null, appSecret: string): Promise<boolean> {
+  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
+  const expectedHex = signatureHeader.slice("sha256=".length);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const computed = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody))
+  );
+  const computedHex = Array.from(computed).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  if (computedHex.length !== expectedHex.length) return false;
+  let ok = 0;
+  for (let i = 0; i < computedHex.length; i++) ok |= computedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
+  return ok === 0;
+}
 
 const HOT_KEYWORDS = ["preço", "preco", "valor", "quanto custa", "comprar", "quero", "agendar", "proposta", "orçamento", "orcamento"];
 const HUMAN_KEYWORDS = ["atendente", "humano", "falar com alguém", "pessoa"];
@@ -512,7 +538,21 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+
+    const appSecret = Deno.env.get("META_APP_SECRET");
+    if (!appSecret) {
+      console.error("Missing META_APP_SECRET secret in project settings");
+      return new Response("Server not configured", { status: 500 });
+    }
+    const signatureHeader = req.headers.get("x-hub-signature-256");
+    const validSignature = await verifyMetaSignature(rawBody, signatureHeader, appSecret);
+    if (!validSignature) {
+      console.warn("[ig-webhook] Rejected call with invalid/missing signature");
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    const body = JSON.parse(rawBody);
     console.log("[ig-webhook] payload:", JSON.stringify(body));
 
     const object = body?.object;
