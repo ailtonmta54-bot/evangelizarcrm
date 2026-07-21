@@ -727,19 +727,39 @@ export default function Robos() {
                     <input
                       ref={docFileInputRef}
                       type="file"
-                      accept=".csv,.txt,text/csv,text/plain"
+                      accept=".csv,.txt,.pdf,text/csv,text/plain,application/pdf"
                       className="hidden"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         e.target.value = "";
                         if (!file || !currentAgent) return;
-                        if (file.size > 10 * 1024 * 1024) {
-                          toast.error("Arquivo maior que 10MB");
+                        if (file.size > 20 * 1024 * 1024) {
+                          toast.error("Arquivo maior que 20MB");
                           return;
                         }
                         setDocLoading(true);
                         try {
-                          let raw = await file.text();
+                          const isPdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+                          let raw = "";
+                          if (isPdf) {
+                            const pdfjs: any = await import("pdfjs-dist");
+                            // Use CDN worker matching the installed version
+                            const workerUrl = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+                            pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+                            const buf = await file.arrayBuffer();
+                            const doc = await pdfjs.getDocument({ data: buf }).promise;
+                            const parts: string[] = [];
+                            for (let p = 1; p <= doc.numPages; p++) {
+                              const page = await doc.getPage(p);
+                              const content = await page.getTextContent();
+                              const pageText = content.items.map((it: any) => it.str).join(" ");
+                              parts.push(pageText);
+                              if (parts.join("\n").length > 250000) break;
+                            }
+                            raw = parts.join("\n").replace(/\s+/g, " ").trim();
+                          } else {
+                            raw = await file.text();
+                          }
                           // Strip UTF-8 BOM
                           if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
                           const isCsv = /\.csv$/i.test(file.name) || file.type === "text/csv";
