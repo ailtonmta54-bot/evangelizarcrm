@@ -120,6 +120,8 @@ export default function Robos() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteLoading, setWebsiteLoading] = useState(false);
   const [websiteContent, setWebsiteContent] = useState<string | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ["agents", activeWorkspaceId],
