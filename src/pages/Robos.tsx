@@ -899,7 +899,7 @@ export default function Robos() {
                       <div className="rounded-lg border p-3 space-y-2 bg-muted/30">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-medium">Documentos na memória do robô</span>
-                          <span className="text-muted-foreground">{((currentAgent as any).knowledge_docs || "").length}/50000</span>
+                          <span className="text-muted-foreground">{((currentAgent as any).knowledge_docs || "").length}/200000</span>
                         </div>
                         <Textarea
                           key={`kdocs-${currentAgent.id}-${((currentAgent as any).knowledge_docs || "").length}`}
