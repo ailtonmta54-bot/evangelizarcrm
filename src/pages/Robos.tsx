@@ -861,7 +861,7 @@ export default function Robos() {
                           const currentDocs = (currentAgent as any).knowledge_docs || "";
                           const separator = currentDocs ? `\n\n--- ${file.name} ---\n` : `--- ${file.name} ---\n`;
                           const combined = currentDocs + separator + extracted;
-                          const LIMIT = 50000;
+                          const LIMIT = 200000;
                           const truncated = combined.length > LIMIT;
                           const newDocs = combined.substring(0, LIMIT);
                           saveField("knowledge_docs" as any, newDocs);
