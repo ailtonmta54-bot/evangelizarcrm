@@ -681,7 +681,7 @@ export default function Robos() {
                               // Append to existing knowledge
                               const currentKnowledge = currentAgent.knowledge || "";
                               const separator = currentKnowledge ? "\n\n--- Conteúdo extraído de " + websiteUrl + " ---\n" : "";
-                              const newKnowledge = (currentKnowledge + separator + content).substring(0, 10000);
+                              const newKnowledge = (currentKnowledge + separator + content).substring(0, 20000);
                               saveField("knowledge", newKnowledge);
                               toast.success("Conteúdo extraído e adicionado à base de conhecimento!");
                             } catch (err: any) {
@@ -790,7 +790,7 @@ export default function Robos() {
                           }
                           const currentKnowledge = currentAgent.knowledge || "";
                           const separator = currentKnowledge ? `\n\n--- Conteúdo de ${file.name} ---\n` : "";
-                          const newKnowledge = (currentKnowledge + separator + extracted).substring(0, 10000);
+                          const newKnowledge = (currentKnowledge + separator + extracted).substring(0, 20000);
                           saveField("knowledge", newKnowledge);
                           toast.success(`Arquivo importado! ${extracted.length} caracteres adicionados.`);
                         } catch (err: any) {
