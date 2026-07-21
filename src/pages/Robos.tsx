@@ -39,7 +39,7 @@ import { InstagramSettings } from "@/components/instagram/InstagramSettings";
 
 const MAX_AGENTS_PER_WORKSPACE = 5;
 
-const AGENT_SAFE_SELECT = "id, company_id, name, description, agent_type, prompt, tone, goal, temperature, active, is_default, knowledge, created_at, updated_at, whatsapp_phone_id, workspace_id, channel, whatsapp_provider, zapi_enabled, status, avatar_url, ignore_video_calls, ignore_voice_calls, ignore_groups, recognize_audio, google_calendar_enabled, google_calendar_link, google_calendar_id, elevenlabs_voice_id, elevenlabs_enabled, away_message, schedule_days, schedule_end, schedule_start, schedule_enabled, keywords";
+const AGENT_SAFE_SELECT = "id, company_id, name, description, agent_type, prompt, tone, goal, temperature, active, is_default, knowledge, knowledge_docs, created_at, updated_at, whatsapp_phone_id, workspace_id, channel, whatsapp_provider, zapi_enabled, status, avatar_url, ignore_video_calls, ignore_voice_calls, ignore_groups, recognize_audio, google_calendar_enabled, google_calendar_link, google_calendar_id, elevenlabs_voice_id, elevenlabs_enabled, away_message, schedule_days, schedule_end, schedule_start, schedule_enabled, keywords";
 
 const avatarOptions = [
   { src: avatarAtendimentoF, label: "Atendente" },
