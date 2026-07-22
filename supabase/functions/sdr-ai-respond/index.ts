@@ -5,41 +5,74 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function jsonResponse(payload: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    const accessToken = authHeader.replace("Bearer ", "").trim();
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const isInternalCall = accessToken === serviceRoleKey;
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      serviceRoleKey
+    );
+
+    let callerUserId: string | null = null;
+    if (!isInternalCall) {
+      const authClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: userData, error: authError } = await authClient.auth.getUser(accessToken);
+      if (authError || !userData.user) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+      callerUserId = userData.user.id;
+    }
+
     const { lead_id, company_id, agent_id, test_mode, test_message, test_history } = await req.json();
 
     if (!company_id) {
-      return new Response(JSON.stringify({ error: "company_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "company_id required" }, 400);
     }
 
     if (!test_mode && !lead_id) {
-      return new Response(JSON.stringify({ error: "lead_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "lead_id required" }, 400);
+    }
+
+    if (!isInternalCall) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", callerUserId)
+        .single();
+
+      if (!profile || profile.company_id !== company_id) {
+        return jsonResponse({ error: "Forbidden" }, 403);
+      }
     }
 
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiApiKey) {
       console.error("OPENAI_API_KEY secret not configured");
-      return new Response(JSON.stringify({ error: "OpenAI API key not configured on platform" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "OpenAI API key not configured on platform" }, 500);
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     let lead = null;
     let history: any[] = [];
@@ -60,15 +93,16 @@ Deno.serve(async (req) => {
       // Production mode - fetch from DB
       const { data: leadData } = await supabase
         .from("leads")
-        .select("name, phone, ai_enabled, agent_id")
+        .select("name, phone, ai_enabled, agent_id, company_id")
         .eq("id", lead_id)
         .single();
 
+      if (!leadData || leadData.company_id !== company_id) {
+        return jsonResponse({ error: "Lead not found" }, 404);
+      }
+
       if (!leadData?.ai_enabled) {
-        return new Response(JSON.stringify({ skipped: true, reason: "AI disabled for this lead" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ skipped: true, reason: "AI disabled for this lead" });
       }
       lead = leadData;
 
@@ -86,7 +120,7 @@ Deno.serve(async (req) => {
     const targetAgentId = agent_id || lead.agent_id;
 
     if (targetAgentId) {
-      const { data } = await supabase.from("agents").select("*").eq("id", targetAgentId).single();
+      const { data } = await supabase.from("agents").select("*").eq("id", targetAgentId).eq("company_id", company_id).single();
       agent = data;
     }
 
@@ -110,10 +144,7 @@ Deno.serve(async (req) => {
     }
 
     if (!agent) {
-      return new Response(JSON.stringify({ error: "No agent found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "No agent found" }, 404);
     }
 
     // Fetch company products for context
@@ -194,33 +225,21 @@ Regras importantes:
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("OpenAI API error:", aiResponse.status, errorText);
-      return new Response(JSON.stringify({ error: "AI generation failed" }), {
-        status: aiResponse.status === 429 ? 429 : 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "AI generation failed" }, aiResponse.status === 429 ? 429 : 500);
     }
 
     const aiResult = await aiResponse.json();
     const generatedMessage = aiResult.choices?.[0]?.message?.content?.trim();
 
     if (!generatedMessage) {
-      return new Response(JSON.stringify({ error: "Empty AI response" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Empty AI response" }, 500);
     }
 
     console.log(`Agent "${agent.name}" response:`, generatedMessage);
 
-    return new Response(
-      JSON.stringify({ success: true, message: generatedMessage, agent_name: agent.name }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, message: generatedMessage, agent_name: agent.name });
   } catch (error) {
     console.error("SDR AI error:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 });

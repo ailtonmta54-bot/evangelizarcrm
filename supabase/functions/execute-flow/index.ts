@@ -5,28 +5,85 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function jsonResponse(payload: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function isPrivateHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (["localhost", "0.0.0.0"].includes(host) || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const private172 = host.match(/^172\.(\d{1,3})\./);
+  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return true;
+  if (/^169\.254\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd")) return true;
+  return false;
+}
+
+function isSafeWebhookUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    return ["https:", "http:"].includes(parsed.protocol) && !isPrivateHostname(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { flow_id, lead_id, company_id } = await req.json();
-
-    if (!flow_id || !lead_id || !company_id) {
-      return new Response(JSON.stringify({ error: "flow_id, lead_id and company_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
+
+    const accessToken = authHeader.replace("Bearer ", "").trim();
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const isInternalCall = accessToken === serviceRoleKey;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      serviceRoleKey
     );
 
+    let callerUserId: string | null = null;
+    if (!isInternalCall) {
+      const authClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: userData, error: authError } = await authClient.auth.getUser(accessToken);
+      if (authError || !userData.user) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+      callerUserId = userData.user.id;
+    }
+
+    const { flow_id, lead_id, company_id } = await req.json();
+
+    if (!flow_id || !lead_id || !company_id) {
+      return jsonResponse({ error: "flow_id, lead_id and company_id required" }, 400);
+    }
+
+    if (!isInternalCall) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", callerUserId)
+        .single();
+      if (!profile || profile.company_id !== company_id) {
+        return jsonResponse({ error: "Forbidden" }, 403);
+      }
+    }
+
     // Get flow
-    const { data: flow } = await supabase.from("flows").select("*").eq("id", flow_id).single();
+    const { data: flow } = await supabase.from("flows").select("*").eq("id", flow_id).eq("company_id", company_id).single();
     if (!flow || !flow.active) {
       return new Response(JSON.stringify({ skipped: true, reason: "Flow inactive or not found" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -44,7 +101,7 @@ Deno.serve(async (req) => {
     }
 
     // Get lead
-    const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).single();
+    const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).eq("company_id", company_id).single();
     if (!lead) {
       return new Response(JSON.stringify({ error: "Lead not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -243,6 +300,10 @@ Deno.serve(async (req) => {
           const webhookUrl = (data as any).webhookUrl;
           const method = (data as any).webhookMethod || "POST";
           if (webhookUrl) {
+            if (!isSafeWebhookUrl(webhookUrl)) {
+              executionLog.push("  → Webhook blocked: invalid or private URL");
+              break;
+            }
             let headers: Record<string, string> = { "Content-Type": "application/json" };
             try {
               const custom = JSON.parse((data as any).webhookHeaders || "{}");
@@ -373,14 +434,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, steps, log: executionLog }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, steps, log: executionLog });
   } catch (error) {
     console.error("Flow execution error:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
