@@ -3,11 +3,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+
 function respond(ok: boolean, payload: Record<string, unknown>): Response {
   return new Response(JSON.stringify({ ok, ...payload }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function isPrivateHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (["localhost", "0.0.0.0"].includes(host) || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const172 = host.match(/^172\.(\d{1,3})\./);
+  if (const172 && Number(const172[1]) >= 16 && Number(const172[1]) <= 31) return true;
+  if (/^169\.254\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd")) return true;
+  return false;
+}
+
+function validatePublicUrl(rawUrl: string): string | null {
+  let formattedUrl = rawUrl.trim();
+  if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
+    formattedUrl = `https://${formattedUrl}`;
+  }
+
+  try {
+    const parsed = new URL(formattedUrl);
+    if (parsed.protocol !== "https:") return null;
+    if (isPrivateHostname(parsed.hostname)) return null;
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -16,15 +46,37 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ ok: false, error: "Não autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const token = authHeader.replace("Bearer ", "").trim();
+    const { data: userData, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !userData.user) {
+      return new Response(JSON.stringify({ ok: false, error: "Não autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { url } = await req.json();
 
     if (!url || typeof url !== "string") {
       return respond(false, { error: "URL é obrigatória" });
     }
 
-    let formattedUrl = url.trim();
-    if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
-      formattedUrl = `https://${formattedUrl}`;
+    const formattedUrl = validatePublicUrl(url);
+    if (!formattedUrl) {
+      return respond(false, { error: "Informe uma URL pública HTTPS válida." });
     }
 
     console.log("Scraping URL:", formattedUrl);
