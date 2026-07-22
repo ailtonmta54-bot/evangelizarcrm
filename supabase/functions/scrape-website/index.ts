@@ -16,8 +16,8 @@ function isPrivateHostname(hostname: string): boolean {
   const host = hostname.toLowerCase();
   if (["localhost", "0.0.0.0"].includes(host) || host.endsWith(".localhost") || host.endsWith(".local")) return true;
   if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
-  const172 = host.match(/^172\.(\d{1,3})\./);
-  if (const172 && Number(const172[1]) >= 16 && Number(const172[1]) <= 31) return true;
+  const private172 = host.match(/^172\.(\d{1,3})\./);
+  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return true;
   if (/^169\.254\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd")) return true;
   return false;
 }
@@ -93,7 +93,8 @@ Deno.serve(async (req) => {
       });
     } catch (fetchErr) {
       console.error("Fetch error:", fetchErr);
-      return respond(false, { error: `Não foi possível acessar o site: ${fetchErr.message}` });
+      const message = fetchErr instanceof Error ? fetchErr.message : "erro desconhecido";
+      return respond(false, { error: `Não foi possível acessar o site: ${message}` });
     }
 
     if (!response.ok) {
