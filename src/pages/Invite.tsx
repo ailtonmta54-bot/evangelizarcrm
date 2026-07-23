@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CheckCircle2, Cross, Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,7 @@ export default function Invite() {
   return <InviteShell icon={<CheckCircle2 className="h-6 w-6 text-success" />} title="Convite aceito" description="Você será redirecionado para o CRM." />;
 }
 
-function InviteShell({ icon, title, description, children }: { icon: React.ReactNode; title: string; description: string; children?: React.ReactNode }) {
+function InviteShell({ icon, title, description, children }: { icon: ReactNode; title: string; description: string; children?: ReactNode }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <Card className="w-full max-w-md">
