@@ -4,20 +4,27 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Save, Users, ShieldCheck, User } from "lucide-react";
+import { Copy, MailPlus, Save, ShieldCheck, User, Users } from "lucide-react";
 import { WorkspacesSettings } from "@/components/workspaces/WorkspacesSettings";
 import { toast } from "sonner";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyId } from "@/hooks/use-company-id";
-import { useUserRole } from "@/hooks/use-user-role";
+import { useUserRole, type AppRole } from "@/hooks/use-user-role";
+import { useWorkspaces } from "@/hooks/use-active-workspace";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Settings() {
   const companyId = useCompanyId();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isOwner } = useUserRole();
   const queryClient = useQueryClient();
   const [companyName, setCompanyName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteWorkspaceId, setInviteWorkspaceId] = useState("");
+  const [inviteRole, setInviteRole] = useState<AppRole>("user");
+  const [lastInviteLink, setLastInviteLink] = useState("");
+  const { data: workspaces = [] } = useWorkspaces();
 
   const { data: company } = useQuery({
     queryKey: ["company-settings", companyId],
@@ -58,6 +65,20 @@ export default function Settings() {
     enabled: !!companyId && isAdmin,
   });
 
+  const { data: invites = [] } = useQuery({
+    queryKey: ["workspace-invites", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workspace_invites")
+        .select("id, email, role, status, token, expires_at, created_at, workspace_id")
+        .eq("company_id", companyId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId && isAdmin,
+  });
+
   useEffect(() => {
     if (company) {
       setCompanyName(company.name);
@@ -76,6 +97,31 @@ export default function Settings() {
       toast.success("Configurações salvas!");
     },
     onError: () => toast.error("Erro ao salvar"),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      if (!inviteWorkspaceId) throw new Error("Selecione um workspace");
+      if (inviteRole === "admin" && !isOwner) throw new Error("Somente owner pode convidar administradores");
+
+      const { data, error } = await supabase.rpc("create_workspace_invite", {
+        _email: inviteEmail,
+        _workspace_id: inviteWorkspaceId,
+        _role: inviteRole,
+      });
+      if (error) throw error;
+
+      const token = data?.[0]?.invite_token;
+      if (!token) throw new Error("Convite criado sem token");
+      return `${window.location.origin}/invite/${token}`;
+    },
+    onSuccess: (link) => {
+      setLastInviteLink(link);
+      setInviteEmail("");
+      queryClient.invalidateQueries({ queryKey: ["workspace-invites"] });
+      toast.success("Convite criado. Copie o link e envie ao cliente.");
+    },
+    onError: (e: any) => toast.error(e?.message || "Erro ao criar convite"),
   });
 
   return (
@@ -99,6 +145,80 @@ export default function Settings() {
       </Card>
 
       {isAdmin && <WorkspacesSettings />}
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <MailPlus className="h-5 w-5" />
+              <div>
+                <CardTitle>Acesso de clientes</CardTitle>
+                <CardDescription>Convide um cliente para acessar somente o workspace selecionado</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-[1fr_1fr_140px_auto]">
+              <Input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="email@cliente.com"
+              />
+              <Select value={inviteWorkspaceId} onValueChange={setInviteWorkspaceId}>
+                <SelectTrigger><SelectValue placeholder="Workspace" /></SelectTrigger>
+                <SelectContent>
+                  {workspaces.map((workspace) => (
+                    <SelectItem key={workspace.id} value={workspace.id}>{workspace.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as AppRole)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">Usuário</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  {isOwner && <SelectItem value="admin">Admin</SelectItem>}
+                </SelectContent>
+              </Select>
+              <Button onClick={() => inviteMutation.mutate()} disabled={inviteMutation.isPending || !inviteEmail} className="gap-2">
+                <MailPlus className="h-4 w-4" /> Convidar
+              </Button>
+            </div>
+
+            {lastInviteLink && (
+              <div className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                <span className="min-w-0 flex-1 truncate">{lastInviteLink}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(lastInviteLink);
+                    toast.success("Link copiado");
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> Copiar
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {invites.slice(0, 6).map((invite) => (
+                <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{invite.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {workspaces.find((w) => w.id === invite.workspace_id)?.name || "Workspace"} · {invite.role}
+                    </p>
+                  </div>
+                  <Badge variant={invite.status === "pending" ? "secondary" : "default"}>{invite.status}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
 
       {isAdmin && (

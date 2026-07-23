@@ -23,6 +23,7 @@ import DataDeletion from "./pages/DataDeletion";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Invite from "./pages/Invite";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/invite/:token" element={<Invite />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route element={<ProtectedRoute />}>
