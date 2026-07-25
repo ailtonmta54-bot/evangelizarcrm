@@ -2,8 +2,14 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Fallbacks garantem que o build de produção nunca inicialize com undefined
+// caso as variáveis VITE_SUPABASE_* não sejam injetadas pelo pipeline de publish.
+// Ambos os valores são publicamente seguros (protegidos por RLS no banco).
+const FALLBACK_SUPABASE_URL = 'https://fpvayxzqvtkkjedgpjck.supabase.co';
+const FALLBACK_SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdmF5eHpxdnRra2plZGdwamNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMzM2MjIsImV4cCI6MjA5MDgwOTYyMn0.K-UXnCAL_JhYcgbJtZEh1W5IBZT22zIeRnPvSZBQqnQ';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
